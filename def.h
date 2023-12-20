@@ -55,7 +55,7 @@
 #include "omp.h"
 using namespace std;
 
-#define TIMES
+//#define TIMES
 #define WORKLOAD_COUNT
 
 //#define INNER_JOIN

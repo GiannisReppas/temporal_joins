@@ -121,8 +121,7 @@ long int getThreadId(bool& needsDetach)
     return i;
 }
 
-unsigned long long extended_bgFS( ExtendedRelation& exR, ExtendedRelation& exS,
-	unsigned long int runNumBuckets, unsigned long int runNumThreads, bool complement)
+unsigned long long extended_bgFS( ExtendedRelation& exR, ExtendedRelation exS, unsigned long int runNumBuckets, unsigned long int runNumThreads, bool complement)
 {
 	#ifdef TIMES
 	Timer tim;
@@ -185,8 +184,6 @@ unsigned long long extended_bgFS( ExtendedRelation& exR, ExtendedRelation& exS,
 				if (needsDetach)
 					if (pthread_detach(threads[threadId]))
 						printf("Whoops\n");
-
-//printf("%d\n", (it_exR->second.second - it_exR->second.first) + (it_exS->second.second - it_exS->second.first) );
 
 				toPass[threadId].threadId = threadId;
 				toPass[threadId].runNumBuckets = runNumBuckets;
@@ -274,7 +271,6 @@ int main(int argc, char **argv)
 	// sort and find borders of each group
 	auto totalStartTime = chrono::steady_clock::now();
 	groupSortAndBorders( exR, exS, runNumThreads);
-//printf("size of oht: %d\n", exR.borders.size() + exS.borders.size());
 	thread_results.resize( runNumThreads);
 	bgFS_jobs.resize( runNumThreads);
 
