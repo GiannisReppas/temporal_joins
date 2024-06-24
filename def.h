@@ -58,11 +58,11 @@ using namespace std;
 #define WORKLOAD_COUNT
 
 /* JOIN TYPES - DEFINE ONLY 1 */
-#define INNER_JOIN
+//#define INNER_JOIN
 //#define LEFT_OUTER_JOIN
 //#define RIGHT_OUTER_JOIN
 //#define FULL_OUTER_JOIN
-//#define ANTI_JOIN
+#define ANTI_JOIN
 
 #define ALGORITHM_NESTED_LOOPS                                     1
 #define ALGORITHM_FORWARD_SCAN_BASED_PLANESWEEP_GROUPING_BUCKETING 2

@@ -34,11 +34,9 @@
 #include "./containers/bucket_index.h"
 
 // Single-threaded processing
-unsigned long long ForwardScanBased_PlaneSweep                   (Relation &R, Relation &S, bool runUnrolled);
 unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing(Relation &R, Relation &S, const BucketIndex &BIR, const BucketIndex &BIS, bool runUnrolled);
 
 // Domain-based parallel processing
-void ParallelDomainBased_Partition(const Relation& R, const Relation& S, Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runMiniJoinsBreakdown, bool runAdaptivePartitioning);
 void ParallelDomainBased_Partition(const Relation& R, const Relation& S, Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *BIR, BucketIndex *BIS, long int runNumPartitionsPerRelation, long int runNumBuckets, long int runNumThreads, bool runMiniJoinsBreakdown, bool runAdaptivePartitioning);
 unsigned long long ParallelDomainBased_ForwardScanBased_PlaneSweep_Grouping_Bucketing(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled, bool runGreedyScheduling, bool runMiniJoinsBreakDown, bool runAdaptivePartitioning);
 
@@ -152,7 +150,8 @@ unsigned long long extended_bgFS( ExtendedRelation exR, ExtendedRelation exS, un
 
 	while (it_exR != exR.borders.end())
 	{
-		if ( (it_exS == exS.borders.end()) || (it_exR->group1 < it_exS->group1) )
+		if ( (it_exS == exS.borders.end()) || 
+			((it_exR->group1 < it_exS->group1) || ((it_exR->group1 == it_exS->group1)) && (it_exR->group2 < it_exS->group2)) )
 		{
 			if (complement)
 			{
@@ -167,7 +166,7 @@ unsigned long long extended_bgFS( ExtendedRelation exR, ExtendedRelation exS, un
 
 			it_exR++;
 		}
-		else if (it_exR->group1 > it_exS->group1)
+		else if ((it_exR->group1 > it_exS->group1) || ((it_exR->group1 == it_exS->group1)) && (it_exR->group2 > it_exS->group2))
 		{
 			it_exS++;
 		}
@@ -265,8 +264,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	// sort
 	auto totalStartTime = chrono::steady_clock::now();
+
+	// sort
 	#ifdef TIMES
 	Timer tim;
 	tim.start();
@@ -294,6 +294,7 @@ int main(int argc, char **argv)
 	double timeSorting = tim.stop();
 	cout << "Sorting time: " << timeSorting << endl;
 	#endif
+
 	// find borders of each group
 	mainBorders( exR, exS, runNumThreads);
 	thread_results.resize( runNumThreads);
