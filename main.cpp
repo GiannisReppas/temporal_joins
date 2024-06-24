@@ -33,25 +33,13 @@
 #include "./containers/relation.h"
 #include "./containers/bucket_index.h"
 
-
-
 // Single-threaded processing
 unsigned long long ForwardScanBased_PlaneSweep                   (Relation &R, Relation &S, bool runUnrolled);
-unsigned long long ForwardScanBased_PlaneSweep_Grouping          (Relation &R, Relation &S, bool runUnrolled);
 unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing(Relation &R, Relation &S, const BucketIndex &BIR, const BucketIndex &BIS, bool runUnrolled);
-
-// Hash-based parallel processing
-void ParallelHashBased_Partition(const Relation& R, const Relation& S, Relation *pR, Relation *pS, long int runNumPartitionsPerRelation, long int runNumThreads);
-void ParallelHashBased_Partition(const Relation& R, const Relation& S, Relation *pR, Relation *pS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumBuckets, long int runNumPartitionsPerRelation, long int runNumThreads);
-unsigned long long ParallelHashBased_ForwardScanBased_PlaneSweep                   (Relation *pR, Relation *pS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled);
-unsigned long long ParallelHashBased_ForwardScanBased_PlaneSweep_Grouping          (Relation *pR, Relation *pS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled);
-unsigned long long ParallelHashBased_ForwardScanBased_PlaneSweep_Grouping_Bucketing(Relation *pR, Relation *pS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled);
 
 // Domain-based parallel processing
 void ParallelDomainBased_Partition(const Relation& R, const Relation& S, Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runMiniJoinsBreakdown, bool runAdaptivePartitioning);
 void ParallelDomainBased_Partition(const Relation& R, const Relation& S, Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *BIR, BucketIndex *BIS, long int runNumPartitionsPerRelation, long int runNumBuckets, long int runNumThreads, bool runMiniJoinsBreakdown, bool runAdaptivePartitioning);
-unsigned long long ParallelDomainBased_ForwardScanBased_PlaneSweep(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled, bool runGreedyScheduling, bool runMiniJoinsBreakDown, bool runAdaptivePartitioning);
-unsigned long long ParallelDomainBased_ForwardScanBased_PlaneSweep_Grouping(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled, bool runGreedyScheduling, bool runMiniJoinsBreakdown, bool runAdaptivePartitioning);
 unsigned long long ParallelDomainBased_ForwardScanBased_PlaneSweep_Grouping_Bucketing(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled, bool runGreedyScheduling, bool runMiniJoinsBreakDown, bool runAdaptivePartitioning);
 
 /* code */
@@ -164,8 +152,7 @@ unsigned long long extended_bgFS( ExtendedRelation exR, ExtendedRelation exS, un
 
 	while (it_exR != exR.borders.end())
 	{
-		if ( (it_exS == exS.borders.end()) || 
-			((it_exR->group1 < it_exS->group1) || ((it_exR->group1 == it_exS->group1) && (it_exR->group2 < it_exS->group2))) )
+		if ( (it_exS == exS.borders.end()) || (it_exR->group1 < it_exS->group1) )
 		{
 			if (complement)
 			{
@@ -180,7 +167,7 @@ unsigned long long extended_bgFS( ExtendedRelation exR, ExtendedRelation exS, un
 
 			it_exR++;
 		}
-		else if ((it_exR->group1 > it_exS->group1) || ((it_exR->group1 == it_exS->group1) && (it_exR->group2 > it_exS->group2)))
+		else if (it_exR->group1 > it_exS->group1)
 		{
 			it_exS++;
 		}

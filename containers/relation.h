@@ -34,6 +34,20 @@
 #include "../def.h"
 
 class ExtendedRelation;
+
+class BordersElement
+{
+public:
+    uint32_t group1;
+    uint32_t group2;
+    uint32_t position_start;
+    uint32_t position_end;
+
+    BordersElement();
+    BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end);
+    ~BordersElement();
+};
+
 struct structForParallelComplement
 {
     ExtendedRelation *rel;
@@ -42,6 +56,18 @@ struct structForParallelComplement
     uint32_t chunk; // thread id [0,c)
     uint32_t groups_index; // index of current group [0,groups_num-1]
     pair<uint32_t,uint32_t> groups_name; // name of group
+};
+
+struct structForParallel_bgFS
+{
+    int threadId;
+    int runNumBuckets;
+    ExtendedRelation* exR;
+    ExtendedRelation* exS;
+    uint32_t R_start;
+    uint32_t R_end;
+    uint32_t S_start;
+    uint32_t S_end;
 };
 
 class ExtendedRecord
@@ -55,19 +81,6 @@ public:
     ExtendedRecord();
     ExtendedRecord(Timestamp start, Timestamp end, uint32_t group1, uint32_t group2);
     ~ExtendedRecord();
-};
-
-class BordersElement
-{
-public:
-    uint32_t group1;
-    uint32_t group2;
-    uint32_t position_start;
-    uint32_t position_end;
-
-    BordersElement();
-    BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end);
-    ~BordersElement();
 };
 
 class ExtendedRelation : public vector<ExtendedRecord>

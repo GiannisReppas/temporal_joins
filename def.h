@@ -53,24 +53,22 @@
 #include "omp.h"
 using namespace std;
 
-//#define TIMES
+/* Logging parameters */
+#define TIMES
 #define WORKLOAD_COUNT
 
-//#define INNER_JOIN
-#define LEFT_OUTER_JOIN
+/* JOIN TYPES - DEFINE ONLY 1 */
+#define INNER_JOIN
+//#define LEFT_OUTER_JOIN
 //#define RIGHT_OUTER_JOIN
 //#define FULL_OUTER_JOIN
 //#define ANTI_JOIN
 
 #define ALGORITHM_NESTED_LOOPS                                     1
-#define ALGORITHM_SORT_MERGEJOIN                                   2
-#define ALGORITHM_FORWARD_SCAN_BASED_PLANESWEEP                    3
-#define ALGORITHM_FORWARD_SCAN_BASED_PLANESWEEP_GROUPING           4
-#define ALGORITHM_FORWARD_SCAN_BASED_PLANESWEEP_GROUPING_BUCKETING 5
+#define ALGORITHM_FORWARD_SCAN_BASED_PLANESWEEP_GROUPING_BUCKETING 2
 
 #define PROCESSING_SINGLE_THREADED                                 0
-#define PROCESSING_PARALLEL_HASH_BASED                             1
-#define PROCESSING_PARALLEL_DOMAIN_BASED                           2
+#define PROCESSING_PARALLEL_DOMAIN_BASED                           1
 
 #define MINIJOIN_ORIGINALS_ORIGINALS                               0
 #define MINIJOIN_REPLICAS_ORIGINALS                                1
@@ -80,22 +78,9 @@ using namespace std;
 
 typedef unsigned long long Timestamp;
 
-
 class Record;
 class Relation;
 class ExtendedRelation;
-
-struct structForParallel_bgFS
-{
-	int threadId;
-	int runNumBuckets;
-	ExtendedRelation* exR;
-	ExtendedRelation* exS;
-	uint32_t R_start;
-	uint32_t R_end;
-	uint32_t S_start;
-	uint32_t S_end;
-};
 
 class Timer
 {

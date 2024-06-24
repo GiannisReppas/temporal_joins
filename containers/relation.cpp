@@ -34,7 +34,6 @@ BordersElement::BordersElement()
 {
 }
 
-
 BordersElement::BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end)
 {
     this->group1 = group1;
