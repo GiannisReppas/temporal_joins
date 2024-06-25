@@ -53,10 +53,61 @@ bool sortByGroupAndStartPoint( ExtendedRecord a, ExtendedRecord b)
 		return a.start < b.start;
 }
 
+unsigned long long domain_based_bgFS(unsigned int runNumThreads, unsigned int runNumBuckets, ExtendedRelation& exR, ExtendedRelation& exS,
+	uint32_t position_start_r, uint32_t position_end_r, uint32_t position_start_s, uint32_t position_end_s)
+{
+	Relation R;
+	R.numRecords = 0;
+	R.minStart = numeric_limits<Timestamp>::max();
+	R.maxStart = numeric_limits<Timestamp>::min();
+	R.minEnd   = numeric_limits<Timestamp>::max();
+	R.maxEnd   = numeric_limits<Timestamp>::min();
+	R.longestRecord = numeric_limits<Timestamp>::min();
+	R.load( exR, position_start_r, position_end_r);
+
+	Relation S;
+	S.numRecords = 0;
+	S.minStart = numeric_limits<Timestamp>::max();
+	S.maxStart = numeric_limits<Timestamp>::min();
+	S.minEnd   = numeric_limits<Timestamp>::max();
+	S.maxEnd   = numeric_limits<Timestamp>::min();
+	S.longestRecord = numeric_limits<Timestamp>::min();
+	S.load( exS, position_start_s, position_end_s);
+
+	/* domain based core */
+
+	unsigned int runNumPartitionsPerRelation = runNumThreads;
+	Relation *pR = new Relation[runNumPartitionsPerRelation];
+	Relation *pS = new Relation[runNumPartitionsPerRelation];
+	Relation *prR = new Relation[runNumPartitionsPerRelation];
+	Relation *prS = new Relation[runNumPartitionsPerRelation];
+	Relation *prfR = new Relation[runNumPartitionsPerRelation];
+	Relation *prfS = new Relation[runNumPartitionsPerRelation];
+
+	BucketIndex* pBIR = new BucketIndex[runNumThreads];
+	BucketIndex* pBIS = new BucketIndex[runNumThreads];
+
+	ParallelDomainBased_Partition(R, S, pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumBuckets, runNumPartitionsPerRelation, runNumThreads, true, true);
+
+	unsigned long long result = ParallelDomainBased_ForwardScanBased_PlaneSweep_Grouping_Bucketing(pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumPartitionsPerRelation, runNumThreads, true, true, true, true);
+
+	delete[] pBIR;
+	delete[] pBIS;
+
+	delete[] pR;
+	delete[] pS;
+	delete[] prR;
+	delete[] prS;
+	delete[] prfR;
+	delete[] prfS;
+
+	return result;
+}
+
 vector<unsigned long long> thread_results;
 vector<int> bgFS_jobs;
 
-void* traditional_bgFS(void* args)
+void* worker_bgFS(void* args)
 {
 	structForParallel_bgFS *gained = (structForParallel_bgFS*) args;
 
@@ -109,7 +160,7 @@ long int getThreadId(bool& needsDetach)
 	return i;
 }
 
-unsigned long long extended_bgFS( ExtendedRelation exR, ExtendedRelation exS, unsigned long int runNumBuckets, unsigned long int runNumThreads, bool complement)
+unsigned long long extended_temporal_join( ExtendedRelation exR, ExtendedRelation exS, unsigned long int runNumBuckets, unsigned long int runNumThreads, bool complement)
 {
 	#ifdef TIMES
 	Timer tim;
@@ -174,6 +225,7 @@ unsigned long long extended_bgFS( ExtendedRelation exR, ExtendedRelation exS, un
 		{
 			if ( (it_exS->position_start != 1) || (it_exS->position_end != 0) )
 			{
+#if defined(PROCESSING_MASTER_WORKER)
 				needsDetach = false;
 				threadId = getThreadId(needsDetach);
 				if (needsDetach)
@@ -188,26 +240,34 @@ unsigned long long extended_bgFS( ExtendedRelation exR, ExtendedRelation exS, un
 				toPass[threadId].R_end = it_exR->position_end;
 				toPass[threadId].S_start = it_exS->position_start;
 				toPass[threadId].S_end = it_exS->position_end;
-				pthread_create( &threads[threadId], NULL, traditional_bgFS, &toPass[threadId]);
+				pthread_create( &threads[threadId], NULL, worker_bgFS, &toPass[threadId]);
+#elif defined(PROCESSING_PARALLEL_DOMAIN_BASED)
+				result += domain_based_bgFS( runNumThreads, runNumBuckets, exR, exS, it_exR->position_start, it_exR->position_end, it_exS->position_start, it_exS->position_end);
+#elif defined(PROCESSING_DIP)
+#endif
 			}
 
 			it_exR++;
 			it_exS++;
 		}
 	}
+#if defined(PROCESSING_MASTER_WORKER)
 	for (uint32_t i=0; i < runNumThreads; i++)
 	{
 			if (bgFS_jobs[i] != 1)
 			pthread_join( threads[i], NULL);
 	}
+#endif
 
 	#ifdef TIMES
 	double timeInnerJoin = tim.stop();
 	cout << "Inner Join time: " << timeInnerJoin << endl;
 	#endif
 
+#if defined(PROCESSING_MASTER_WORKER)
 	for (auto& r : thread_results)
 		result += r;
+#endif
 
 	return result;
 }
@@ -302,23 +362,23 @@ int main(int argc, char **argv)
 
 	// run join
 	#if defined(INNER_JOIN)
-	result += extended_bgFS( exR, exS, runNumBuckets, runNumThreads, false);
+	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, false);
 
 	#elif defined(LEFT_OUTER_JOIN)
-	result += extended_bgFS( exR, exS, runNumBuckets, runNumThreads, false);
-	result += extended_bgFS( exR, exS, runNumBuckets, runNumThreads, true);
+	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, false);
+	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, true);
 
 	#elif defined(RIGHT_OUTER_JOIN)
-	result += extended_bgFS( exR, exS, runNumBuckets, runNumThreads, false);
-	result += extended_bgFS( exS, exR, runNumBuckets, runNumThreads, true);
+	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, false);
+	result += extended_temporal_join( exS, exR, runNumBuckets, runNumThreads, true);
 
 	#elif defined(FULL_OUTER_JOIN)
-	result += extended_bgFS( exR, exS, runNumBuckets, runNumThreads, false);
-	result += extended_bgFS( exR, exS, runNumBuckets, runNumThreads, true);
-	result += extended_bgFS( exS, exR, runNumBuckets, runNumThreads, true);
+	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, false);
+	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, true);
+	result += extended_temporal_join( exS, exR, runNumBuckets, runNumThreads, true);
 
 	#elif defined(ANTI_JOIN)
-	result += extended_bgFS( exR, exS, runNumBuckets, runNumThreads, true);
+	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, true);
 
 	#endif
 

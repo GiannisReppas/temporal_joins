@@ -53,7 +53,7 @@
 #include "omp.h"
 using namespace std;
 
-/* Logging parameters */
+/* LOGGING PARAMETERS */
 #define TIMES
 #define WORKLOAD_COUNT
 
@@ -64,12 +64,12 @@ using namespace std;
 //#define FULL_OUTER_JOIN
 #define ANTI_JOIN
 
-#define ALGORITHM_NESTED_LOOPS                                     1
-#define ALGORITHM_FORWARD_SCAN_BASED_PLANESWEEP_GROUPING_BUCKETING 2
+/* ALGORITHM TO BE USED FOR PARALLEL EXECUTION - DEFINE ONLY 1 */
+//#define PROCESSING_MASTER_WORKER
+#define PROCESSING_PARALLEL_DOMAIN_BASED
+//#define PROCESSING_DIP
 
-#define PROCESSING_SINGLE_THREADED                                 0
-#define PROCESSING_PARALLEL_DOMAIN_BASED                           1
-
+/* INTERNAL PARAMETERS OF DOMAIN-BASED PARTITIONING - DONT TOUCH ANY - ALL SHOULD BE ACTIVE */
 #define MINIJOIN_ORIGINALS_ORIGINALS                               0
 #define MINIJOIN_REPLICAS_ORIGINALS                                1
 #define MINIJOIN_ORIGINALS_REPLICAS                                2
