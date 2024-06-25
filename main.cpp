@@ -106,10 +106,47 @@ unsigned long long domain_based_bgFS(unsigned int runNumThreads, unsigned int ru
 
 vector<unsigned long long> thread_results;
 vector<int> bgFS_jobs;
+long int getThreadId(bool& needsDetach)
+{
+	uint32_t i=0;
+	while(true)
+	{
+		if (bgFS_jobs[i] != 0)
+		{
+			if (bgFS_jobs[i] == 2)
+				needsDetach = true;
+			bgFS_jobs[i] = 0;
+			break;
+		}
+
+		i == (bgFS_jobs.size() - 1) ? i = 0: i++;
+	}
+
+	return i;
+}
+
+int stick_this_thread_to_core(int core_id)
+{
+	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+	if (core_id < 0 || core_id >= num_cores)
+		return -1;
+
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	CPU_SET(core_id, &cpuset);
+
+	pthread_t currect_thread = pthread_self();
+	return pthread_setaffinity_np( currect_thread, sizeof(cpu_set_t), &cpuset);
+}
 
 void* worker_bgFS(void* args)
 {
 	structForParallel_bgFS *gained = (structForParallel_bgFS*) args;
+
+#ifdef THREAD_PINNING
+	if (stick_this_thread_to_core(gained->threadId) != 0)
+		printf("A thread pinning failed. Probably due to a wrong number of threads given\n");
+#endif
 
 	Relation R;
 	R.numRecords = 0;
@@ -139,25 +176,6 @@ void* worker_bgFS(void* args)
 	bgFS_jobs[ gained->threadId ] = 2;
 
 	return NULL;
-}
-
-long int getThreadId(bool& needsDetach)
-{
-	uint32_t i=0;
-	while(true)
-	{
-		if (bgFS_jobs[i] != 0)
-		{
-			if (bgFS_jobs[i] == 2)
-				needsDetach = true;
-			bgFS_jobs[i] = 0;
-			break;
-		}
-
-		i == (bgFS_jobs.size() - 1) ? i = 0: i++;
-	}
-
-	return i;
 }
 
 unsigned long long extended_temporal_join( ExtendedRelation exR, ExtendedRelation exS, unsigned long int runNumBuckets, unsigned long int runNumThreads, bool complement)
@@ -243,7 +261,6 @@ unsigned long long extended_temporal_join( ExtendedRelation exR, ExtendedRelatio
 				pthread_create( &threads[threadId], NULL, worker_bgFS, &toPass[threadId]);
 #elif defined(PROCESSING_PARALLEL_DOMAIN_BASED)
 				result += domain_based_bgFS( runNumThreads, runNumBuckets, exR, exS, it_exR->position_start, it_exR->position_end, it_exS->position_start, it_exS->position_end);
-#elif defined(PROCESSING_DIP)
 #endif
 			}
 

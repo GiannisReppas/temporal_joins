@@ -50,6 +50,7 @@
 #include <fstream>
 #include <future>
 #include <chrono>
+#include <unistd.h>
 #include "omp.h"
 using namespace std;
 
@@ -58,16 +59,19 @@ using namespace std;
 #define WORKLOAD_COUNT
 
 /* JOIN TYPES - DEFINE ONLY 1 */
-//#define INNER_JOIN
+#define INNER_JOIN
 //#define LEFT_OUTER_JOIN
 //#define RIGHT_OUTER_JOIN
 //#define FULL_OUTER_JOIN
-#define ANTI_JOIN
+//#define ANTI_JOIN
 
 /* ALGORITHM TO BE USED FOR PARALLEL EXECUTION - DEFINE ONLY 1 */
 //#define PROCESSING_MASTER_WORKER
 #define PROCESSING_PARALLEL_DOMAIN_BASED
 //#define PROCESSING_DIP
+
+/* PARAMETERS RELATED TO HARDWARE_OPTIMIZATIONS - DEFINE ANY THAT YOU NEED - ALL IS ADVISED */
+#define THREAD_PINNING
 
 /* INTERNAL PARAMETERS OF DOMAIN-BASED PARTITIONING - DONT TOUCH ANY - ALL SHOULD BE ACTIVE */
 #define MINIJOIN_ORIGINALS_ORIGINALS                               0
