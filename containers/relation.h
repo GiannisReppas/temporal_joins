@@ -27,7 +27,6 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-
 #ifndef _RELATION_H_
 #define _RELATION_H_
 

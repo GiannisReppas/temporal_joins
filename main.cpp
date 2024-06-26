@@ -27,18 +27,17 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-
 #include "def.h"
 #include "getopt.h"
 #include "./containers/relation.h"
 #include "./containers/bucket_index.h"
 
 // Single-threaded processing
-unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing(Relation &R, Relation &S, const BucketIndex &BIR, const BucketIndex &BIS, bool runUnrolled);
+unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
 
 // Domain-based parallel processing
-void ParallelDomainBased_Partition(const Relation& R, const Relation& S, Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *BIR, BucketIndex *BIS, long int runNumPartitionsPerRelation, long int runNumBuckets, long int runNumThreads, bool runMiniJoinsBreakdown, bool runAdaptivePartitioning);
-unsigned long long ParallelDomainBased_ForwardScanBased_PlaneSweep_Grouping_Bucketing(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumPartitionsPerRelation, long int runNumThreads, bool runUnrolled, bool runGreedyScheduling, bool runMiniJoinsBreakDown, bool runAdaptivePartitioning);
+void ParallelDomainBased_Partition_MiniJoinsBreakdown_Adaptive(const Relation& R, const Relation& S, Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *BIR, BucketIndex *BIS, long int runNumPartitionsPerRelation, long int runNumBuckets, long int runNumThreads);
+unsigned long long ParallelDomainBased_MiniJoinsGreedy_ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumPartitionsPerRelation, long int runNumThreads);
 
 /* code */
 
@@ -87,9 +86,9 @@ unsigned long long domain_based_bgFS(unsigned int runNumThreads, unsigned int ru
 	BucketIndex* pBIR = new BucketIndex[runNumThreads];
 	BucketIndex* pBIS = new BucketIndex[runNumThreads];
 
-	ParallelDomainBased_Partition(R, S, pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumBuckets, runNumPartitionsPerRelation, runNumThreads, true, true);
+	ParallelDomainBased_Partition_MiniJoinsBreakdown_Adaptive(R, S, pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumBuckets, runNumPartitionsPerRelation, runNumThreads);
 
-	unsigned long long result = ParallelDomainBased_ForwardScanBased_PlaneSweep_Grouping_Bucketing(pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumPartitionsPerRelation, runNumThreads, true, true, true, true);
+	unsigned long long result = ParallelDomainBased_MiniJoinsGreedy_ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumPartitionsPerRelation, runNumThreads);
 
 	delete[] pBIR;
 	delete[] pBIS;
@@ -170,7 +169,7 @@ void* worker_bgFS(void* args)
 	BIR.build(R, gained->runNumBuckets);
 	BIS.build(S, gained->runNumBuckets);
 
-	thread_results[ gained->threadId ] += ForwardScanBased_PlaneSweep_Grouping_Bucketing(R, S, BIR, BIS, true);
+	thread_results[ gained->threadId ] += ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(R, S, BIR, BIS);
 
 	// make current thread free to be used for next group
 	bgFS_jobs[ gained->threadId ] = 2;

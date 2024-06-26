@@ -30,32 +30,6 @@
 #include "../def.h"
 #include "../containers/relation.h"
 
-
-
-unsigned long long NestedLoops_Rolled(const Relation &R, const Relation &S)
-{
-	unsigned long long result = 0;
-	auto lastR = R.end();
-	auto lastS = S.end();
-	
-	
-	for (auto r = R.begin(); r != lastR; r++)
-	{
-		for (auto s = S.begin(); s != lastS; s++)
-		{
-#ifdef WORKLOAD_COUNT
-			result++;
-#else
-			result += r->start ^ s->start;
-#endif
-		}
-	}
-	
-	
-	return result;
-}
-
-
 unsigned long long NestedLoops_Unrolled(const Relation &R, const Relation &S)
 {
 	unsigned long long result = 0;
