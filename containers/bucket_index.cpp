@@ -93,18 +93,6 @@ void BucketIndex::build(const Relation &R, long int numBuckets)
 	}
 }
 
-
-void BucketIndex::print(char c)
-{
-	cout << "Bucket Index" << endl;
-	cout << "============" << endl;
-	cout << "bucket range = " << this->bucket_range << endl;
-	for (long int bid = 0; bid < this->numBuckets-1; bid++)
-		cout << "bucket " << bid << ": " << c << "[" << (*this)[bid].last->start << ", " << (*this)[bid].last->end << "]" << endl;
-	cout << "bucket " << (this->numBuckets-1) << ": NULL" << endl;
-}
-
-
 BucketIndex::~BucketIndex()
 {
 }

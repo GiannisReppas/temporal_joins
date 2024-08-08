@@ -32,12 +32,8 @@
 #include "./containers/relation.h"
 #include "./containers/bucket_index.h"
 
-// Single-threaded processing
-unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
-
-// Domain-based parallel processing
-void ParallelDomainBased_Partition_MiniJoinsBreakdown_Adaptive(const Relation& R, const Relation& S, Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *BIR, BucketIndex *BIS, long int runNumPartitionsPerRelation, long int runNumBuckets, long int runNumThreads);
-unsigned long long ParallelDomainBased_MiniJoinsGreedy_ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumPartitionsPerRelation, long int runNumThreads);
+// bguFS
+unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
 
 /* code */
 
@@ -52,100 +48,42 @@ bool sortByGroupAndStartPoint( ExtendedRecord a, ExtendedRecord b)
 		return a.start < b.start;
 }
 
-unsigned long long domain_based_bgFS(unsigned int runNumThreads, unsigned int runNumBuckets, ExtendedRelation& exR, ExtendedRelation& exS,
-	uint32_t position_start_r, uint32_t position_end_r, uint32_t position_start_s, uint32_t position_end_s)
-{
-	Relation R;
-	R.numRecords = 0;
-	R.minStart = numeric_limits<Timestamp>::max();
-	R.maxStart = numeric_limits<Timestamp>::min();
-	R.minEnd   = numeric_limits<Timestamp>::max();
-	R.maxEnd   = numeric_limits<Timestamp>::min();
-	R.longestRecord = numeric_limits<Timestamp>::min();
-	R.load( exR, position_start_r, position_end_r);
-
-	Relation S;
-	S.numRecords = 0;
-	S.minStart = numeric_limits<Timestamp>::max();
-	S.maxStart = numeric_limits<Timestamp>::min();
-	S.minEnd   = numeric_limits<Timestamp>::max();
-	S.maxEnd   = numeric_limits<Timestamp>::min();
-	S.longestRecord = numeric_limits<Timestamp>::min();
-	S.load( exS, position_start_s, position_end_s);
-
-	/* domain based core */
-
-	unsigned int runNumPartitionsPerRelation = runNumThreads;
-	Relation *pR = new Relation[runNumPartitionsPerRelation];
-	Relation *pS = new Relation[runNumPartitionsPerRelation];
-	Relation *prR = new Relation[runNumPartitionsPerRelation];
-	Relation *prS = new Relation[runNumPartitionsPerRelation];
-	Relation *prfR = new Relation[runNumPartitionsPerRelation];
-	Relation *prfS = new Relation[runNumPartitionsPerRelation];
-
-	BucketIndex* pBIR = new BucketIndex[runNumThreads];
-	BucketIndex* pBIS = new BucketIndex[runNumThreads];
-
-	ParallelDomainBased_Partition_MiniJoinsBreakdown_Adaptive(R, S, pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumBuckets, runNumPartitionsPerRelation, runNumThreads);
-
-	unsigned long long result = ParallelDomainBased_MiniJoinsGreedy_ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(pR, pS, prR, prS, prfR, prfS, pBIR, pBIS, runNumPartitionsPerRelation, runNumThreads);
-
-	delete[] pBIR;
-	delete[] pBIS;
-
-	delete[] pR;
-	delete[] pS;
-	delete[] prR;
-	delete[] prS;
-	delete[] prfR;
-	delete[] prfS;
-
-	return result;
-}
-
 vector<unsigned long long> thread_results;
-vector<int> bgFS_jobs;
+vector<int> bguFS_jobs;
 long int getThreadId(bool& needsDetach)
 {
 	uint32_t i=0;
 	while(true)
 	{
-		if (bgFS_jobs[i] != 0)
+		if (bguFS_jobs[i] != 0)
 		{
-			if (bgFS_jobs[i] == 2)
+			if (bguFS_jobs[i] == 2)
 				needsDetach = true;
-			bgFS_jobs[i] = 0;
+			bguFS_jobs[i] = 0;
 			break;
 		}
 
-		i == (bgFS_jobs.size() - 1) ? i = 0: i++;
+		i == (bguFS_jobs.size() - 1) ? i = 0: i++;
 	}
 
 	return i;
 }
 
-int stick_this_thread_to_core(int core_id)
+struct structForParallel_bguFS
 {
-	int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-	if (core_id < 0 || core_id >= num_cores)
-		return -1;
+    int threadId;
+    int runNumBuckets;
+    ExtendedRelation* exR;
+    ExtendedRelation* exS;
+    uint32_t R_start;
+    uint32_t R_end;
+    uint32_t S_start;
+    uint32_t S_end;
+};
 
-	cpu_set_t cpuset;
-	CPU_ZERO(&cpuset);
-	CPU_SET(core_id, &cpuset);
-
-	pthread_t currect_thread = pthread_self();
-	return pthread_setaffinity_np( currect_thread, sizeof(cpu_set_t), &cpuset);
-}
-
-void* worker_bgFS(void* args)
+void* worker_bguFS(void* args)
 {
-	structForParallel_bgFS *gained = (structForParallel_bgFS*) args;
-
-#ifdef THREAD_PINNING
-	if (stick_this_thread_to_core(gained->threadId) != 0)
-		printf("A thread pinning failed. Probably due to a wrong number of threads given\n");
-#endif
+	structForParallel_bguFS *gained = (structForParallel_bguFS*) args;
 
 	Relation R;
 	R.numRecords = 0;
@@ -153,7 +91,6 @@ void* worker_bgFS(void* args)
 	R.maxStart = numeric_limits<Timestamp>::min();
 	R.minEnd   = numeric_limits<Timestamp>::max();
 	R.maxEnd   = numeric_limits<Timestamp>::min();
-	R.longestRecord = numeric_limits<Timestamp>::min();
 	R.load( *(gained->exR), gained->R_start, gained->R_end);
 
 	Relation S;
@@ -162,17 +99,16 @@ void* worker_bgFS(void* args)
 	S.maxStart = numeric_limits<Timestamp>::min();
 	S.minEnd   = numeric_limits<Timestamp>::max();
 	S.maxEnd   = numeric_limits<Timestamp>::min();
-	S.longestRecord = numeric_limits<Timestamp>::min();
 	S.load( *(gained->exS), gained->S_start, gained->S_end);
 
 	BucketIndex BIR, BIS;
-	BIR.build(R, gained->runNumBuckets);
-	BIS.build(S, gained->runNumBuckets);
+	BIR.build(R, 1000);
+	BIS.build(S, 1000);
 
-	thread_results[ gained->threadId ] += ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(R, S, BIR, BIS);
+	thread_results[ gained->threadId ] += bguFS(R, S, BIR, BIS);
 
 	// make current thread free to be used for next group
-	bgFS_jobs[ gained->threadId ] = 2;
+	bguFS_jobs[ gained->threadId ] = 2;
 
 	return NULL;
 }
@@ -186,11 +122,11 @@ unsigned long long extended_temporal_join( ExtendedRelation exR, ExtendedRelatio
 	fill( thread_results.begin(), thread_results.end(), 0);
 	unsigned long long result = 0;
 
-	structForParallel_bgFS toPass[runNumThreads];
+	structForParallel_bguFS toPass[runNumThreads];
 	pthread_t threads[runNumThreads];
 	uint32_t threadId;
 	bool needsDetach;
-	fill( bgFS_jobs.begin(), bgFS_jobs.end(), 1);
+	fill( bguFS_jobs.begin(), bguFS_jobs.end(), 1);
 
 	// sort, create complement
 	if (complement)
@@ -215,7 +151,6 @@ unsigned long long extended_temporal_join( ExtendedRelation exR, ExtendedRelatio
 	Timestamp domainStart = min(exR.minStart, exS.minStart);
 	vector< BordersElement >::iterator it_exR = exR.borders.begin();
 	vector< BordersElement >::iterator it_exS = exS.borders.begin();
-
 	while (it_exR != exR.borders.end())
 	{
 		if ( (it_exS == exS.borders.end()) || 
@@ -242,7 +177,6 @@ unsigned long long extended_temporal_join( ExtendedRelation exR, ExtendedRelatio
 		{
 			if ( (it_exS->position_start != 1) || (it_exS->position_end != 0) )
 			{
-#if defined(PROCESSING_MASTER_WORKER)
 				needsDetach = false;
 				threadId = getThreadId(needsDetach);
 				if (needsDetach)
@@ -257,45 +191,37 @@ unsigned long long extended_temporal_join( ExtendedRelation exR, ExtendedRelatio
 				toPass[threadId].R_end = it_exR->position_end;
 				toPass[threadId].S_start = it_exS->position_start;
 				toPass[threadId].S_end = it_exS->position_end;
-				pthread_create( &threads[threadId], NULL, worker_bgFS, &toPass[threadId]);
-#elif defined(PROCESSING_PARALLEL_DOMAIN_BASED)
-				result += domain_based_bgFS( runNumThreads, runNumBuckets, exR, exS, it_exR->position_start, it_exR->position_end, it_exS->position_start, it_exS->position_end);
-#endif
+				pthread_create( &threads[threadId], NULL, worker_bguFS, &toPass[threadId]);
 			}
 
 			it_exR++;
 			it_exS++;
 		}
 	}
-#if defined(PROCESSING_MASTER_WORKER)
 	for (uint32_t i=0; i < runNumThreads; i++)
 	{
-			if (bgFS_jobs[i] != 1)
+			if (bguFS_jobs[i] != 1)
 			pthread_join( threads[i], NULL);
 	}
-#endif
 
 	#ifdef TIMES
 	double timeInnerJoin = tim.stop();
 	cout << "Inner Join time: " << timeInnerJoin << endl;
 	#endif
 
-#if defined(PROCESSING_MASTER_WORKER)
 	for (auto& r : thread_results)
 		result += r;
-#endif
 
 	return result;
 }
 
 int main(int argc, char **argv)
 {
-	char c;
 	unsigned long int runNumBuckets = 1000, runNumThreads = 1;
-	bool runUnrolled = false;
 	unsigned long long result = 0;
 
-	// Parse command line input.
+	// Parse and check command line input.
+	char c;
 	while ((c = getopt(argc, argv, "t:")) != -1)
 	{
 		switch (c)
@@ -313,8 +239,6 @@ int main(int argc, char **argv)
 				exit(1);
 		}
 	}
-
-	// Sanity check
 	if (runNumBuckets < 1)
 	{
 		cerr << "error - number of buckets must be at least 1" << endl;
@@ -347,25 +271,9 @@ int main(int argc, char **argv)
 	Timer tim;
 	tim.start();
 	#endif
-	if (c == 1)
-	{
-		sort( exR.begin(), exR.end(), sortByGroupAndStartPoint);
-		sort( exS.begin(), exS.end(), sortByGroupAndStartPoint);
-	}
-	else
-	{
-		#pragma omp parallel sections
-		{
-			#pragma omp section
-			{
-				sort( exR.begin(), exR.end(), sortByGroupAndStartPoint);
-			}
-			#pragma omp section
-			{
-				sort( exS.begin(), exS.end(), sortByGroupAndStartPoint);
-			}
-		}
-	}
+	sort( exR.begin(), exR.end(), sortByGroupAndStartPoint);
+	sort( exS.begin(), exS.end(), sortByGroupAndStartPoint);
+
 	#ifdef TIMES
 	double timeSorting = tim.stop();
 	cout << "Sorting time: " << timeSorting << endl;
@@ -373,10 +281,10 @@ int main(int argc, char **argv)
 
 	// find borders of each group
 	mainBorders( exR, exS, runNumThreads);
-	thread_results.resize( runNumThreads);
-	bgFS_jobs.resize( runNumThreads);
 
 	// run join
+	thread_results.resize( runNumThreads);
+	bguFS_jobs.resize( runNumThreads);
 	#if defined(INNER_JOIN)
 	result += extended_temporal_join( exR, exS, runNumBuckets, runNumThreads, false);
 
@@ -401,9 +309,8 @@ int main(int argc, char **argv)
 	// Report stats
 	auto totalEndTime = chrono::steady_clock::now();
 
-	cout << "Total count: " << result << endl;
+	cout << "\nTotal count: " << result << endl;
 	cout << "Total time: " << chrono::duration_cast<chrono::milliseconds>(totalEndTime - totalStartTime).count() << " ms" << endl;
-	cout << endl;
 
 	return 0;
 }

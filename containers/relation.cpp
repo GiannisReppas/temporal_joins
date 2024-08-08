@@ -422,18 +422,11 @@ ExtendedRelation::~ExtendedRelation()
 {
 }
 
-
-bool CompareByEnd(const Record& lhs, const Record& rhs)
-{
-	return (lhs.end < rhs.end);
-}
-
-
+/**************************************************************************************************/
 
 Record::Record()
 {
 }
-
 
 //Record::Record(RecordId id, Timestamp start, Timestamp end)
 Record::Record(Timestamp start, Timestamp end)
@@ -441,7 +434,6 @@ Record::Record(Timestamp start, Timestamp end)
 	this->start = start;
 	this->end = end;
 }
-
 
 bool Record::operator < (const Record& rhs) const
 {
@@ -453,18 +445,9 @@ bool Record::operator >= (const Record& rhs) const
 	return !((*this) < rhs);
 }
 
-
-void Record::print(char c) const
-{
-	cout << c << "[" << this->start << ".." << this->end << "]" << endl;
-}
-
-   
 Record::~Record()
 {
 }
-
-
 
 Relation::Relation()
 {
@@ -472,57 +455,6 @@ Relation::Relation()
 	this->maxStart = numeric_limits<Timestamp>::min();
 	this->minEnd   = numeric_limits<Timestamp>::max();
 	this->maxEnd   = numeric_limits<Timestamp>::min();
-	this->longestRecord = numeric_limits<Timestamp>::min();
-}
-
-
-void Relation::load(const char *filename)
-{
-	Timestamp start, end;
-	uint32_t group;
-	ifstream inp(filename);
-
-	
-	if (!inp)
-	{
-		cerr << "error - cannot open file " << filename << endl;
-		exit(1);
-	}
-
-	while (inp >> start >> end)
-	{
-		this->emplace_back(start, end);
-
-		this->minStart = min(this->minStart, start);
-		this->maxStart = max(this->maxStart, start);
-		this->minEnd   = min(this->minEnd  , end);
-		this->maxEnd   = max(this->maxEnd  , end);
-		this->longestRecord = max(this->longestRecord, end-start+1);
-	}
-	inp.close();
-	
-	this->numRecords = this->size();
-}
-
-
-void Relation::load(const Relation& I, size_t from, size_t by)
-{
-	size_t tupleCount = (I.size() + by - 1 - from) / by;
-
-
-	for (size_t i = from; i < I.size(); i += by)
-	{
-		this->emplace_back(I[i].start, I[i].end);
-
-		this->minStart = min(this->minStart, I[i].start);
-		this->maxStart = max(this->maxStart, I[i].start);
-		this->minEnd   = min(this->minEnd  , I[i].end);
-		this->maxEnd   = max(this->maxEnd  , I[i].end);
-		this->longestRecord = max(this->longestRecord, I[i].end-I[i].start+1);
-	}
-    this->numRecords = by - from;
-
-	sort(this->begin(), this->end());
 }
 
 void Relation::load(const ExtendedRelation& I, size_t from, size_t till)
@@ -535,30 +467,10 @@ void Relation::load(const ExtendedRelation& I, size_t from, size_t till)
         this->maxStart = max(this->maxStart, I[i].start);
         this->minEnd   = min(this->minEnd  , I[i].end);
         this->maxEnd   = max(this->maxEnd  , I[i].end);
-        this->longestRecord = max(this->longestRecord, I[i].end-I[i].start+1);
     }
 
     this->numRecords = this->size();
 }
-
-void Relation::sortByStart()
-{
-	sort(this->begin(), this->end());
-}
-
-
-void Relation::sortByEnd()
-{
-	sort(this->begin(), this->end(), CompareByEnd);
-}
-
-
-void Relation::print(char c)
-{
-	for (const Record& rec : (*this))
-		rec.print(c);
-}
-
 
 Relation::~Relation()
 {

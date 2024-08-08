@@ -33,8 +33,6 @@
 #include "../def.h"
 #include "relation.h"
 
-
-
 class Bucket
 {
 public:
@@ -45,8 +43,6 @@ public:
 	~Bucket();
 };
 
-
-
 class BucketIndex : public vector<Bucket>
 {
 public:
@@ -55,7 +51,6 @@ public:
 	
 	BucketIndex();
 	void build(const Relation &R, long int numBuckets);
-	void print(char c);
 	~BucketIndex();
 };
 

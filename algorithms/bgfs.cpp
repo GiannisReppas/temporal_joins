@@ -1,9 +1,10 @@
 /******************************************************************************
- * Project:  ijoin
- * Purpose:  Compute interval overlap joins
- * Author:   Panagiotis Bouros, pbour@github.io
+ * Project:  temporal_joins
+ * Purpose:  Compute temporal joins with conjunctive equality predicates
+ * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
  * Copyright (c) 2017, Panagiotis Bouros
+ * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
  *
@@ -26,23 +27,20 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-
 #include "../def.h"
 #include "../containers/relation.h"
 #include "../containers/bucket_index.h"
-#include "../scheduling/greedy.h"
 
-
-
-unsigned long long NestedLoops_Rolled(const Relation &R, const Relation &S);
-unsigned long long NestedLoops_Unrolled(const Relation &R, const Relation &S);
-
+bool CompareByEnd(const Record& lhs, const Record& rhs)
+{
+	return (lhs.end < rhs.end);
+}
 
 ////////////////////
 // Internal loops //
 ////////////////////
 
-inline unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_InternalLoop_Unrolled(Group &G, RelationIterator firstFS, RelationIterator lastFS, const BucketIndex &BI, Timestamp minStart)
+inline unsigned long long bguFS_InternalLoop(Group &G, RelationIterator firstFS, RelationIterator lastFS, const BucketIndex &BI, Timestamp minStart)
 {
 	unsigned long long result = 0;
 	long int cbucket_id, pbucket_id;
@@ -1479,32 +1477,11 @@ inline unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Interna
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
 #ifdef WORKLOAD_COUNT
-					result += 24;
+					result += 3;
 #else
-					result += (curr+0)->start ^ (pivot+0)->start;
-					result += (curr+1)->start ^ (pivot+0)->start;
-					result += (curr+2)->start ^ (pivot+0)->start;
-					result += (curr+0)->start ^ (pivot+1)->start;
-					result += (curr+1)->start ^ (pivot+1)->start;
-					result += (curr+2)->start ^ (pivot+1)->start;
-					result += (curr+0)->start ^ (pivot+2)->start;
-					result += (curr+1)->start ^ (pivot+2)->start;
-					result += (curr+2)->start ^ (pivot+2)->start;
-					result += (curr+0)->start ^ (pivot+3)->start;
-					result += (curr+1)->start ^ (pivot+3)->start;
-					result += (curr+2)->start ^ (pivot+3)->start;
-					result += (curr+0)->start ^ (pivot+4)->start;
-					result += (curr+1)->start ^ (pivot+4)->start;
-					result += (curr+2)->start ^ (pivot+4)->start;
-					result += (curr+0)->start ^ (pivot+5)->start;
-					result += (curr+1)->start ^ (pivot+5)->start;
-					result += (curr+2)->start ^ (pivot+5)->start;
-					result += (curr+0)->start ^ (pivot+6)->start;
-					result += (curr+1)->start ^ (pivot+6)->start;
-					result += (curr+2)->start ^ (pivot+6)->start;
-					result += (curr+0)->start ^ (pivot+7)->start;
-					result += (curr+1)->start ^ (pivot+7)->start;
-					result += (curr+2)->start ^ (pivot+7)->start;
+					result += (curr+0)->start ^ pivot->start;
+					result += (curr+1)->start ^ pivot->start;
+					result += (curr+2)->start ^ pivot->start;
 #endif
 					pivot++;
 				}
@@ -2620,43 +2597,11 @@ inline unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Interna
 	return result;
 }
 
-
-// When R contains a single group in the beginning of the domain, for mini-joins MINIJOIN_REPLICAS_ORIGINALS and MINIJOIN_ORIGINALS_REPLICAS (Unrolled)
-inline unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Reduced_Unrolled(const Relation &R, const Relation &S, const BucketIndex& BIS)
-{
-	unsigned long long result = 0;
-	auto r = R.begin();
-	auto s = S.begin();
-	auto lastR = R.end();
-	auto lastS = S.end();
-	long int cbucket_id, pbucket_id;
-	Group GR;
-	
-	
-	// Step 1: gather group for R
-	while (r < lastR)
-	{
-		GR.emplace_back(r->start, r->end);
-		r++;
-	}
-	
-	// Sort current group by end point
-	GR.sortByEnd();
-	
-	// Step 2: run internal loop
-	result += ForwardScanBased_PlaneSweep_Grouping_Bucketing_InternalLoop_Unrolled(GR, s, lastS, BIS, S.minStart);
-	
-	
-	return result;
-}
-
-
-
 //////////////////////////////
 // Single-thread processing //
 //////////////////////////////
 
-unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS)
+unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS)
 {
 	unsigned long long result = 0;
 	auto r = R.begin();
@@ -2678,10 +2623,10 @@ unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relat
 			}
 			
 			// Sort current group by end point.
-			GR.sortByEnd();
+			sort( GR.begin(), GR.end(), CompareByEnd);
 			
 			// Step 2: run internal loop.
-			result += ForwardScanBased_PlaneSweep_Grouping_Bucketing_InternalLoop_Unrolled(GR, s, lastS, BIS, S.minStart);
+			result += bguFS_InternalLoop(GR, s, lastS, BIS, S.minStart);
 
 
 			// Step 3: empty current group.
@@ -2697,64 +2642,16 @@ unsigned long long ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relat
 			}
 			
 			// Sort current group by end point.
-			GS.sortByEnd();
+			sort( GS.begin(), GS.end(), CompareByEnd );
 			
 			
 			// Step 2: run internal loop.
-			result += ForwardScanBased_PlaneSweep_Grouping_Bucketing_InternalLoop_Unrolled(GS, r, lastR, BIR, R.minStart);
+			result += bguFS_InternalLoop(GS, r, lastR, BIR, R.minStart);
 
 			
 			// Step 3: empty current group.
 			GS.clear();
 		}
-	}
-	
-	
-	return result;
-}
-
-
-//////////////////////////////////////
-// Domain-based parallel processing //
-//////////////////////////////////////
-
-// For the mj+greedy/uniform or the mj+greedy/adaptive setup (Unrolled)
-unsigned long long ParallelDomainBased_MiniJoinsGreedy_ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(Relation *pR, Relation *pS, Relation *prR, Relation *prS, Relation *prfR, Relation *prfS, BucketIndex *pBIR, BucketIndex *pBIS, long int runNumPartitionsPerRelation, long int runNumThreads)
-{
-	long int runNumPartitions = runNumThreads;
-	unsigned long long result = 0;
-	GreedyScheduler GS;
-	
-	
-	GS.schedule(pR, pS, prR, prS, prfR, prfS, runNumPartitionsPerRelation, runNumThreads);
-	
-	#pragma omp parallel for num_threads(runNumThreads) reduction(+ : result)
-	for (long int t = 0; t < runNumThreads; t++)
-	{
-		unsigned long long res = 0;
-		
-		for (const std::pair<long int, long int>& mj : GS.TBH[t].mjoins)
-		{
-			switch (mj.second)
-			{
-				case MINIJOIN_ORIGINALS_ORIGINALS:
-					res += ForwardScanBased_PlaneSweep_Grouping_Bucketing_Unrolled(pR[mj.first], pS[mj.first], pBIR[mj.first], pBIS[mj.first]);
-					break;
-				case MINIJOIN_REPLICAS_ORIGINALS:
-					res += ForwardScanBased_PlaneSweep_Grouping_Bucketing_Reduced_Unrolled(prR[mj.first], pS[mj.first], pBIS[mj.first]);
-					break;
-				case MINIJOIN_ORIGINALS_REPLICAS:
-					res += ForwardScanBased_PlaneSweep_Grouping_Bucketing_Reduced_Unrolled(prS[mj.first], pR[mj.first], pBIR[mj.first]);	// ALERT: Input order inverted.
-					break;
-				case MINIJOIN_FREPLICAS_ORIGINALS:
-					res += NestedLoops_Unrolled(prfR[mj.first], pS[mj.first]);
-					break;
-				case MINIJOIN_ORIGINALS_FREPLICAS:
-					res += NestedLoops_Unrolled(prfS[mj.first], pR[mj.first]);	// ALERT: Input order inverted.
-					break;
-			}
-		}
-		result += res;
 	}
 	
 	

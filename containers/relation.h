@@ -47,6 +47,8 @@ public:
     ~BordersElement();
 };
 
+void mainBorders( ExtendedRelation& R, ExtendedRelation& S, uint32_t c);
+
 struct structForParallelComplement
 {
     ExtendedRelation *rel;
@@ -55,18 +57,6 @@ struct structForParallelComplement
     uint32_t chunk; // thread id [0,c)
     uint32_t groups_index; // index of current group [0,groups_num-1]
     pair<uint32_t,uint32_t> groups_name; // name of group
-};
-
-struct structForParallel_bgFS
-{
-    int threadId;
-    int runNumBuckets;
-    ExtendedRelation* exR;
-    ExtendedRelation* exS;
-    uint32_t R_start;
-    uint32_t R_end;
-    uint32_t S_start;
-    uint32_t S_end;
 };
 
 class ExtendedRecord
@@ -92,7 +82,7 @@ private:
     Timestamp domainStart;
     Timestamp domainEnd;
 
-    /* job lists that shows ids of unused threads */
+    /* job list that shows ids of unused threads */
     vector<long int> jobsList;
     long int getThreadId(bool&);
 
@@ -146,7 +136,7 @@ public:
     ~ExtendedRelation();
 };
 
-void mainBorders( ExtendedRelation& R, ExtendedRelation& S, uint32_t c);
+/**************************************************************************************************/
 
 class Record
 {
@@ -158,31 +148,22 @@ public:
 	Record(Timestamp start, Timestamp end);
 	bool operator < (const Record& rhs) const;
 	bool operator >= (const Record& rhs) const;
-	void print() const;
-	void print(char c) const;
 	~Record();
 };
-
-
 
 class Relation : public vector<Record>
 {
 public:
 	size_t numRecords;
 	Timestamp minStart, maxStart, minEnd, maxEnd;
-	Timestamp longestRecord;
 
 	Relation();
-	void load(const char *filename);
-	void load(const Relation& I, size_t from = 0, size_t by = 1);
     void load(const ExtendedRelation& I, size_t from, size_t till);
-	void sortByStart();
-	void sortByEnd();
-	void print(char c);
 	~Relation();
 };
 typedef Relation::const_iterator RelationIterator;
 
 typedef Relation Group;
 typedef Group::const_iterator GroupIterator;
+
 #endif //_RELATION_H_
