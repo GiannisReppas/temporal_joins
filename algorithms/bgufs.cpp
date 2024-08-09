@@ -3,7 +3,6 @@
  * Purpose:  Compute temporal joins with conjunctive equality predicates
  * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
  * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
@@ -27,9 +26,8 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-#include "../def.h"
-#include "../containers/relation.h"
-#include "../containers/bucket_index.h"
+#include "../containers/relation.hpp"
+#include "../containers/bucket_index.hpp"
 
 bool CompareByEnd(const Record& lhs, const Record& rhs)
 {
@@ -2623,7 +2621,7 @@ unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex
 			}
 			
 			// Sort current group by end point.
-			sort( GR.begin(), GR.end(), CompareByEnd);
+			std::sort( GR.begin(), GR.end(), CompareByEnd);
 			
 			// Step 2: run internal loop.
 			result += bguFS_InternalLoop(GR, s, lastS, BIS, S.minStart);
@@ -2642,7 +2640,7 @@ unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex
 			}
 			
 			// Sort current group by end point.
-			sort( GS.begin(), GS.end(), CompareByEnd );
+			std::sort( GS.begin(), GS.end(), CompareByEnd );
 			
 			
 			// Step 2: run internal loop.

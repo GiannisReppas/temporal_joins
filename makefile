@@ -9,14 +9,13 @@ else
         LDFLAGS =
 endif
 
-SOURCES = containers/relation.cpp containers/bucket_index.cpp algorithms/bgfs.cpp
+SOURCES = containers/borders.cpp algorithms/scheduling.cpp containers/relation.cpp algorithms/findBorders.cpp algorithms/complement.cpp containers/bucket_index.cpp algorithms/bgufs.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 all: main
 
 main: $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) main.cpp -o ij $(LDADD)
-
 
 .cpp.o:
 	$(CC) $(CFLAGS) -c $< -o $@

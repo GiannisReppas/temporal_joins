@@ -1,9 +1,9 @@
 /******************************************************************************
- * Project:  ijoin
- * Purpose:  Compute interval overlap joins
- * Author:   Panagiotis Bouros, pbour@github.io
+ * Project:  temporal_joins
+ * Purpose:  Compute temporal joins with conjunctive equality predicates
+ * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
+ * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
  *
@@ -26,73 +26,32 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
+#include "../def.hpp"
 
-#include "bucket_index.hpp"
-
-
-
-Bucket::Bucket()
+/*
+Returns a thread id that is free to be used.
+Array jobs contains all available threads.
+Each thread has 3 different states:
+	0 --> thread is currently executing a job and its unavailable 
+	1 --> thread is available and doesn't need to be detached to be used again
+	2 --> thread is available and needs to be detached to be used again
+boolean varriable needsDetach has to be used to inform the caller about the need to be detached
+*/
+uint32_t getThreadId(bool& needsDetach, std::vector<uint32_t>& jobs)
 {
-}
-
-
-Bucket::Bucket(RelationIterator i)
-{
-	this->last = i;
-}
-
-
-Bucket::~Bucket()
-{
-}
-
-
-
-BucketIndex::BucketIndex()
-{
-}
-
-
-void BucketIndex::build(const Relation &R, long int numBuckets)
-{
-	long int cbucket_id = 0, btmp;
-	RelationIterator i = R.begin(), lastI = R.end();
-	auto ms = R.maxStart;
-
-	
-	if (R.minStart == R.maxStart)
-		ms += 1;
-	
-	this->numBuckets = numBuckets;
-	this->bucket_range = (Timestamp)ceil((double)(ms-R.minStart)/this->numBuckets);
-	this->reserve(this->numBuckets);
-	for (long int i = 0; i < this->numBuckets; i++)
-		this->push_back(Bucket(lastI));
-
-	while (i != lastI)
+	uint32_t i=0;
+	while(true)
 	{
-		btmp = ceil((double)(i->start-R.minStart)/this->bucket_range);
-		if (btmp >= this->numBuckets)
-			btmp = this->numBuckets-1;
-		
-		if (cbucket_id != btmp)
+		if (jobs[i] != 0)
 		{
-			(*this)[cbucket_id].last = i;
-			cbucket_id++;
+			if (jobs[i] == 2)
+				needsDetach = true;
+			jobs[i] = 0;
+			break;
 		}
-		else
-		{
-			++i;
-		}
-	}
-	(*this)[this->numBuckets-1].last = lastI;
-	for (long int i = this->numBuckets-2; i >= 0; i--)
-	{
-		if ((*this)[i].last == lastI)
-			(*this)[i].last = (*this)[i+1].last;
-	}
-}
 
-BucketIndex::~BucketIndex()
-{
+		i == (jobs.size() - 1) ? i = 0: i++;
+	}
+
+	return i;
 }

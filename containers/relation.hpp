@@ -1,9 +1,9 @@
 /******************************************************************************
- * Project:  ijoin
- * Purpose:  Compute interval overlap joins
- * Author:   Panagiotis Bouros, pbour@github.io
+ * Project:  temporal_joins
+ * Purpose:  Compute temporal joins with conjunctive equality predicates
+ * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
+ * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
  *
@@ -26,33 +26,62 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
+#ifndef _RELATION_H_
+#define _RELATION_H_
 
-#ifndef _BUCKET_INDEX_H_
-#define _BUCKET_INDEX_H_
+#include "../def.hpp"
 
-#include "../def.h"
-#include "relation.h"
-
-class Bucket
+class ExtendedRecord
 {
 public:
-	RelationIterator last;
+	Timestamp start;
+	Timestamp end;
+	uint32_t group1;
+	uint32_t group2;
 
-	Bucket();
-	Bucket(RelationIterator i);
-	~Bucket();
+	ExtendedRecord();
+	ExtendedRecord(Timestamp start, Timestamp end, uint32_t group1, uint32_t group2);
+	~ExtendedRecord();
 };
 
-class BucketIndex : public vector<Bucket>
+class ExtendedRelation : public std::vector<ExtendedRecord>
 {
 public:
-	long int numBuckets;
-	Timestamp bucket_range;
-	
-	BucketIndex();
-	void build(const Relation &R, long int numBuckets);
-	~BucketIndex();
+	Timestamp minStart, maxEnd;
+
+	ExtendedRelation();
+	void load(const char *filename);
+	~ExtendedRelation();
 };
 
-typedef vector<Bucket>::const_iterator BucketIndexIterator;
-#endif //_BUCKET_INDEX_H_
+/**************************************************************************************************/
+
+class Record
+{
+public:
+	Timestamp start;
+	Timestamp end;
+
+	Record();
+	Record(Timestamp start, Timestamp end);
+	bool operator < (const Record& rhs) const;
+	bool operator >= (const Record& rhs) const;
+	~Record();
+};
+
+class Relation : public std::vector<Record>
+{
+public:
+	size_t numRecords;
+	Timestamp minStart, maxStart, minEnd, maxEnd;
+
+	Relation();
+	void load(const ExtendedRelation& I, size_t from, size_t till);
+	~Relation();
+};
+typedef Relation::const_iterator RelationIterator;
+
+typedef Relation Group;
+typedef Group::const_iterator GroupIterator;
+
+#endif //_RELATION_H_

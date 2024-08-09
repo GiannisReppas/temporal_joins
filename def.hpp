@@ -1,9 +1,9 @@
 /******************************************************************************
- * Project:  ijoin
- * Purpose:  Compute interval overlap joins
- * Author:   Panagiotis Bouros, pbour@github.io
+ * Project:  temporal_joins
+ * Purpose:  Compute temporal joins with conjunctive equality predicates
+ * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
+ * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
  *
@@ -26,73 +26,62 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
+#pragma once
+#ifndef _DEF_H_
+#define _DEF_H_
 
-#include "bucket_index.hpp"
+#include <iostream>
+#include <limits>
+#include <vector>
+#include <algorithm>
+#include <string>
+#include <fstream>
+#include <chrono>
+#include <cmath>
+#include <unistd.h>
+#include <pthread.h>
 
+/* LOGGING PARAMETERS */
+#define TIMES
+#define WORKLOAD_COUNT
 
+/* JOIN TYPES - DEFINE ONLY 1 */
+//#define INNER_JOIN
+//#define LEFT_OUTER_JOIN
+//#define RIGHT_OUTER_JOIN
+//#define FULL_OUTER_JOIN
+#define ANTI_JOIN
 
-Bucket::Bucket()
+typedef unsigned long long Timestamp;
+
+class Timer
 {
-}
-
-
-Bucket::Bucket(RelationIterator i)
-{
-	this->last = i;
-}
-
-
-Bucket::~Bucket()
-{
-}
-
-
-
-BucketIndex::BucketIndex()
-{
-}
-
-
-void BucketIndex::build(const Relation &R, long int numBuckets)
-{
-	long int cbucket_id = 0, btmp;
-	RelationIterator i = R.begin(), lastI = R.end();
-	auto ms = R.maxStart;
-
+private:
+	using Clock = std::chrono::high_resolution_clock;
+	Clock::time_point start_time, stop_time;
 	
-	if (R.minStart == R.maxStart)
-		ms += 1;
+public:
+	Timer()
+	{
+		start();
+	}
 	
-	this->numBuckets = numBuckets;
-	this->bucket_range = (Timestamp)ceil((double)(ms-R.minStart)/this->numBuckets);
-	this->reserve(this->numBuckets);
-	for (long int i = 0; i < this->numBuckets; i++)
-		this->push_back(Bucket(lastI));
-
-	while (i != lastI)
+	void start()
 	{
-		btmp = ceil((double)(i->start-R.minStart)/this->bucket_range);
-		if (btmp >= this->numBuckets)
-			btmp = this->numBuckets-1;
-		
-		if (cbucket_id != btmp)
-		{
-			(*this)[cbucket_id].last = i;
-			cbucket_id++;
-		}
-		else
-		{
-			++i;
-		}
+		start_time = Clock::now();
 	}
-	(*this)[this->numBuckets-1].last = lastI;
-	for (long int i = this->numBuckets-2; i >= 0; i--)
+	
+	
+	double getElapsedTimeInSeconds()
 	{
-		if ((*this)[i].last == lastI)
-			(*this)[i].last = (*this)[i+1].last;
+		return std::chrono::duration<double>(stop_time - start_time).count();
 	}
-}
-
-BucketIndex::~BucketIndex()
-{
-}
+	
+	
+	double stop()
+	{
+		stop_time = Clock::now();
+		return getElapsedTimeInSeconds();
+	}
+};
+#endif

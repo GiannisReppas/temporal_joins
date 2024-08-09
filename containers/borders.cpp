@@ -3,7 +3,6 @@
  * Purpose:  Compute temporal joins with conjunctive equality predicates
  * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
  * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
@@ -27,70 +26,20 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-#pragma once
-#ifndef _DEF_H_
-#define _DEF_H_
+#include "borders.hpp"
 
-#include <algorithm>
-#include <map>
-#include <pthread.h>
-
-#include <cstdio>
-#include <cstdlib>
-#include <cmath>
-#include <cstring>
-#include <iostream>
-#include <limits>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <fstream>
-#include <future>
-#include <chrono>
-#include <unistd.h>
-using namespace std;
-
-/* LOGGING PARAMETERS */
-#define TIMES
-#define WORKLOAD_COUNT
-
-/* JOIN TYPES - DEFINE ONLY 1 */
-//#define INNER_JOIN
-//#define LEFT_OUTER_JOIN
-//#define RIGHT_OUTER_JOIN
-//#define FULL_OUTER_JOIN
-#define ANTI_JOIN
-
-typedef unsigned long long Timestamp;
-
-class Timer
+BordersElement::BordersElement()
 {
-private:
-	using Clock = chrono::high_resolution_clock;
-	Clock::time_point start_time, stop_time;
-	
-public:
-	Timer()
-	{
-		start();
-	}
-	
-	void start()
-	{
-		start_time = Clock::now();
-	}
-	
-	
-	double getElapsedTimeInSeconds()
-	{
-		return chrono::duration<double>(stop_time - start_time).count();
-	}
-	
-	
-	double stop()
-	{
-		stop_time = Clock::now();
-		return getElapsedTimeInSeconds();
-	}
-};
-#endif
+}
+
+BordersElement::BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end)
+{
+	this->group1 = group1;
+	this->group2 = group2;
+	this->position_start = position_start;
+	this->position_end = position_end;
+}
+
+BordersElement::~BordersElement()
+{
+}

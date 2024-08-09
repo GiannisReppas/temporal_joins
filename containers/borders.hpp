@@ -1,9 +1,9 @@
 /******************************************************************************
- * Project:  ijoin
- * Purpose:  Compute interval overlap joins
- * Author:   Panagiotis Bouros, pbour@github.io
+ * Project:  temporal_joins
+ * Purpose:  Compute temporal joins with conjunctive equality predicates
+ * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
+ * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
  *
@@ -26,73 +26,19 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
+#include "../def.hpp"
 
-#include "bucket_index.hpp"
-
-
-
-Bucket::Bucket()
+class BordersElement
 {
-}
+public:
+	uint32_t group1;
+	uint32_t group2;
+	uint32_t position_start;
+	uint32_t position_end;
 
+	BordersElement();
+	BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end);
+	~BordersElement();
+};
 
-Bucket::Bucket(RelationIterator i)
-{
-	this->last = i;
-}
-
-
-Bucket::~Bucket()
-{
-}
-
-
-
-BucketIndex::BucketIndex()
-{
-}
-
-
-void BucketIndex::build(const Relation &R, long int numBuckets)
-{
-	long int cbucket_id = 0, btmp;
-	RelationIterator i = R.begin(), lastI = R.end();
-	auto ms = R.maxStart;
-
-	
-	if (R.minStart == R.maxStart)
-		ms += 1;
-	
-	this->numBuckets = numBuckets;
-	this->bucket_range = (Timestamp)ceil((double)(ms-R.minStart)/this->numBuckets);
-	this->reserve(this->numBuckets);
-	for (long int i = 0; i < this->numBuckets; i++)
-		this->push_back(Bucket(lastI));
-
-	while (i != lastI)
-	{
-		btmp = ceil((double)(i->start-R.minStart)/this->bucket_range);
-		if (btmp >= this->numBuckets)
-			btmp = this->numBuckets-1;
-		
-		if (cbucket_id != btmp)
-		{
-			(*this)[cbucket_id].last = i;
-			cbucket_id++;
-		}
-		else
-		{
-			++i;
-		}
-	}
-	(*this)[this->numBuckets-1].last = lastI;
-	for (long int i = this->numBuckets-2; i >= 0; i--)
-	{
-		if ((*this)[i].last == lastI)
-			(*this)[i].last = (*this)[i+1].last;
-	}
-}
-
-BucketIndex::~BucketIndex()
-{
-}
+typedef std::vector<BordersElement> Borders;
