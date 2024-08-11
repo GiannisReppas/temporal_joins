@@ -36,7 +36,8 @@
 void mainBorders( ExtendedRelation& R, Borders& bordersR, ExtendedRelation& S, Borders& bordersS, uint32_t c);
 
 // complement
-void convert_to_complement(ExtendedRelation& R, Borders& borders, Timestamp foreignStart, Timestamp foreignEnd, uint32_t c);
+void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelation& complement, Borders& borders_complement,
+							Timestamp foreignStart, Timestamp foreignEnd, uint32_t c);
 
 // bguFS
 unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
@@ -118,21 +119,6 @@ unsigned long long extended_temporal_join( ExtendedRelation& exR, Borders& borde
 	uint32_t threadId;
 	bool needsDetach;
 	fill( jobsList.begin(), jobsList.end(), 1);
-
-	// create complement
-	if (outerFlag)
-	{
-		#ifdef TIMES
-		tim.start();
-		#endif
-
-		convert_to_complement( exS, bordersS, exR.minStart, exR.maxEnd, runNumThreads);
-
-		#ifdef TIMES
-		double timeComplement = tim.stop();
-		std::cout << "Complement time: " << timeComplement << " and size " << exS.size() << std::endl;
-		#endif
-	}
 
 	#ifdef TIMES
 	tim.start();
@@ -279,19 +265,34 @@ int main(int argc, char **argv)
 
 	#elif defined(LEFT_OUTER_JOIN)
 	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, false);
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, true);
+	ExtendedRelation exS_complement;
+	Borders bordersS_complement;
+	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, jobsList, thread_results, true);
 
 	#elif defined(RIGHT_OUTER_JOIN)
 	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, false);
-	result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, jobsList, thread_results, true);
+	ExtendedRelation exR_complement;
+	Borders bordersR_complement;
+	convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
+	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, jobsList, thread_results, true);
 
 	#elif defined(FULL_OUTER_JOIN)
 	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, false);
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, true);
-	result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, jobsList, thread_results, true);
+	ExtendedRelation exS_complement;
+	Borders bordersS_complement;
+	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, jobsList, thread_results, true);
+	ExtendedRelation exR_complement;
+	Borders bordersR_complement;
+	convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
+	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, jobsList, thread_results, true);
 
 	#elif defined(ANTI_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, true);
+	ExtendedRelation exS_complement;
+	Borders bordersS_complement;
+	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, jobsList, thread_results, true);
 
 	#endif
 

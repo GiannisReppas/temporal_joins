@@ -42,6 +42,7 @@ struct structForParallelComplement
 	Borders* borders;			// border information for relation
 	std::vector<size_t>* each_group_sizes;	// array to save the size of each mini complement
 	ExtendedRelation* complement;		// place to save complement
+	Borders* borders_complement;		// border information to be set for complement relation
 	uint32_t group_id;			// id of current group [0,groups_num-1]
 	uint32_t group1;			// group1 value to compute complement
 	uint32_t group2;			// group2 value to compute complement
@@ -115,13 +116,17 @@ void* set_complement(void* args)
 	// set borders for current group (set an error border in case of an empty complement)
 	if (write_flag)
 	{
-		(*gained->borders)[gained->group_id].position_start = (*(gained->each_group_sizes))[gained->group_id];
-		(*gained->borders)[gained->group_id].position_end = point_to_write - 1;
+		(*gained->borders_complement)[gained->group_id].group1 = (*gained->borders)[gained->group_id].group1;
+		(*gained->borders_complement)[gained->group_id].group2 = (*gained->borders)[gained->group_id].group2;
+		(*gained->borders_complement)[gained->group_id].position_start = (*(gained->each_group_sizes))[gained->group_id];
+		(*gained->borders_complement)[gained->group_id].position_end = point_to_write - 1;
 	}
 	else
 	{
-		(*gained->borders)[gained->group_id].position_start = 1;
-		(*gained->borders)[gained->group_id].position_end = 0;
+		(*gained->borders_complement)[gained->group_id].group1 = (*gained->borders)[gained->group_id].group1;
+		(*gained->borders_complement)[gained->group_id].group2 = (*gained->borders)[gained->group_id].group2; 
+		(*gained->borders_complement)[gained->group_id].position_start = 1;
+		(*gained->borders_complement)[gained->group_id].position_end = 0;
 	}
 
 	// make current thread free to be used for next group
@@ -130,8 +135,14 @@ void* set_complement(void* args)
 	return NULL;
 }
 
-void convert_to_complement(ExtendedRelation& R, Borders& borders, Timestamp foreignStart, Timestamp foreignEnd, uint32_t c)
+void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelation& complement, Borders& borders_complement,
+							Timestamp foreignStart, Timestamp foreignEnd, uint32_t c)
 {
+	#ifdef TIMES
+	Timer tim;
+	tim.start();
+	#endif
+
 	structForParallelComplement toPass[c];
 	pthread_t threads[c];
 	bool needsDetach;
@@ -142,8 +153,8 @@ void convert_to_complement(ExtendedRelation& R, Borders& borders, Timestamp fore
 	Timestamp domainStart = std::min( foreignStart, R.minStart);
 	Timestamp domainEnd = std::max( foreignEnd, R.maxEnd);
 	std::vector<size_t> each_group_sizes( borders.size(), 0);
-	ExtendedRelation complement;
 	uint32_t current_group_id;
+	borders_complement.resize( borders.size() );
 
 	///////////////////////////////// find the size of complement /////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,6 +220,7 @@ void convert_to_complement(ExtendedRelation& R, Borders& borders, Timestamp fore
 		toPass[threadId].rel = &R;
 		toPass[threadId].borders = &borders;
 		toPass[threadId].complement = &complement;
+		toPass[threadId].borders_complement = &borders_complement;
 		toPass[threadId].group_id = current_group_id;
 		toPass[threadId].group1 = b.group1;
 		toPass[threadId].group2 = b.group2;
@@ -225,5 +237,8 @@ void convert_to_complement(ExtendedRelation& R, Borders& borders, Timestamp fore
 	}
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	R.swap( complement );
+	#ifdef TIMES
+	double timeComplement = tim.stop();
+	std::cout << "Complement time: " << timeComplement << " and size " << complement.size() << std::endl;
+	#endif
 }
