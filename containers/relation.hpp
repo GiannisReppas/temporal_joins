@@ -44,9 +44,11 @@ public:
 	~ExtendedRecord();
 };
 
-class ExtendedRelation : public std::vector<ExtendedRecord>
+class ExtendedRelation
 {
 public:
+	ExtendedRecord* record_list;
+	size_t numRecords;
 	Timestamp minStart, maxEnd;
 
 	ExtendedRelation();
@@ -69,9 +71,10 @@ public:
 	~Record();
 };
 
-class Relation : public std::vector<Record>
+class Relation
 {
 public:
+	Record* record_list;
 	size_t numRecords;
 	Timestamp minStart, maxStart, minEnd, maxEnd;
 
@@ -79,9 +82,7 @@ public:
 	void load(const ExtendedRelation& I, size_t from, size_t till);
 	~Relation();
 };
-typedef Relation::const_iterator RelationIterator;
 
 typedef Relation Group;
-typedef Group::const_iterator GroupIterator;
 
 #endif //_RELATION_H_

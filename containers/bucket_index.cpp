@@ -1,9 +1,9 @@
 /******************************************************************************
- * Project:  ijoin
- * Purpose:  Compute interval overlap joins
- * Author:   Panagiotis Bouros, pbour@github.io
+ * Project:  temporal_joins
+ * Purpose:  Compute temporal joins with conjunctive equality predicates
+ * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
+ * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
  *
@@ -36,7 +36,7 @@ Bucket::Bucket()
 }
 
 
-Bucket::Bucket(RelationIterator i)
+Bucket::Bucket(Record* i)
 {
 	this->last = i;
 }
@@ -50,24 +50,25 @@ Bucket::~Bucket()
 
 BucketIndex::BucketIndex()
 {
+	this->bucket_list = NULL;
 }
 
 
 void BucketIndex::build(const Relation &R, long int numBuckets)
 {
 	long int cbucket_id = 0, btmp;
-	RelationIterator i = R.begin(), lastI = R.end();
+	Record* i = R.record_list;
+	Record* lastI = R.record_list + R.numRecords;
 	auto ms = R.maxStart;
-
 	
 	if (R.minStart == R.maxStart)
 		ms += 1;
 	
 	this->numBuckets = numBuckets;
 	this->bucket_range = (Timestamp)ceil((double)(ms-R.minStart)/this->numBuckets);
-	this->reserve(this->numBuckets);
+	this->bucket_list = (Bucket*) malloc( numBuckets * sizeof(Bucket) );
 	for (long int i = 0; i < this->numBuckets; i++)
-		this->push_back(Bucket(lastI));
+		this->bucket_list[i] = Bucket(lastI);
 
 	while (i != lastI)
 	{
@@ -77,7 +78,7 @@ void BucketIndex::build(const Relation &R, long int numBuckets)
 		
 		if (cbucket_id != btmp)
 		{
-			(*this)[cbucket_id].last = i;
+			this->bucket_list[cbucket_id].last = i;
 			cbucket_id++;
 		}
 		else
@@ -85,14 +86,15 @@ void BucketIndex::build(const Relation &R, long int numBuckets)
 			++i;
 		}
 	}
-	(*this)[this->numBuckets-1].last = lastI;
+	this->bucket_list[this->numBuckets-1].last = lastI;
 	for (long int i = this->numBuckets-2; i >= 0; i--)
 	{
-		if ((*this)[i].last == lastI)
-			(*this)[i].last = (*this)[i+1].last;
+		if (this->bucket_list[i].last == lastI)
+			this->bucket_list[i].last = this->bucket_list[i+1].last;
 	}
 }
 
 BucketIndex::~BucketIndex()
 {
+	free( this->bucket_list );
 }

@@ -1,9 +1,9 @@
 /******************************************************************************
- * Project:  ijoin
- * Purpose:  Compute interval overlap joins
- * Author:   Panagiotis Bouros, pbour@github.io
+ * Project:  temporal_joins
+ * Purpose:  Compute temporal joins with conjunctive equality predicates
+ * Author:   Ioannis Reppas, giannisreppas@hotmail.com
  ******************************************************************************
- * Copyright (c) 2017, Panagiotis Bouros
+ * Copyright (c) 2023, Ioannis Reppas
  *
  * All rights reserved.
  *
@@ -36,16 +36,17 @@
 class Bucket
 {
 public:
-	RelationIterator last;
+	Record* last;
 
 	Bucket();
-	Bucket(RelationIterator i);
+	Bucket(Record* i);
 	~Bucket();
 };
 
-class BucketIndex : public std::vector<Bucket>
+class BucketIndex
 {
 public:
+	Bucket* bucket_list;
 	long int numBuckets;
 	Timestamp bucket_range;
 	
@@ -54,5 +55,4 @@ public:
 	~BucketIndex();
 };
 
-typedef std::vector<Bucket>::const_iterator BucketIndexIterator;
 #endif //_BUCKET_INDEX_H_

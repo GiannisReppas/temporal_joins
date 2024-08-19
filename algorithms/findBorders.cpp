@@ -66,7 +66,7 @@ void* find_borders(void* args)
 
 	// find chunk to read from S
 	uint32_t toTakeStart, toTakeEnd;
-	chunk_to_read( gained->rel->size(), gained->c, gained->chunk, toTakeStart, toTakeEnd);
+	chunk_to_read( gained->rel->numRecords, gained->c, gained->chunk, toTakeStart, toTakeEnd);
 	--toTakeStart;
 	--toTakeEnd;
 
@@ -78,13 +78,13 @@ void* find_borders(void* args)
 	Timestamp last = toTakeStart;
 	for (uint32_t i = toTakeStart; i < toTakeEnd; i++)
 	{
-		if ( ((*(gained->rel))[i].group1 != (*(gained->rel))[i+1].group1) || ((*(gained->rel))[i].group2 != (*(gained->rel))[i+1].group2) )
+		if ( (gained->rel->record_list[i].group1 != gained->rel->record_list[i+1].group1) || (gained->rel->record_list[i].group2 != gained->rel->record_list[i+1].group2) )
 		{
-			(*(gained->localBorders))[gained->chunk].push_back( BordersElement( (*(gained->rel))[last].group1, (*(gained->rel))[last].group2, last, i) );
+			(*(gained->localBorders))[gained->chunk].push_back( BordersElement( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2, last, i) );
 			last = i + 1;
 		}
 	}
-	(*(gained->localBorders))[gained->chunk].push_back( BordersElement( (*(gained->rel))[last].group1, (*(gained->rel))[last].group2, last, toTakeEnd) );
+	(*(gained->localBorders))[gained->chunk].push_back( BordersElement( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2, last, toTakeEnd) );
 
 	return NULL;
 }

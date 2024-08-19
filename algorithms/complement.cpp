@@ -59,14 +59,14 @@ void* find_complement_sizes(void *args)
 	// find size of current group
 	for (uint32_t i = (*gained->borders)[gained->group_id].position_start; i <= (*gained->borders)[gained->group_id].position_end; i++)
 	{
-		if (last < (*(gained->rel))[i].start)
+		if (last < gained->rel->record_list[i].start)
 		{
-			last = (*(gained->rel))[i].end;
+			last = gained->rel->record_list[i].end;
 			count++;
 		}
-		else if (last < (*(gained->rel))[i].end)
+		else if (last < gained->rel->record_list[i].end)
 		{
-			last = (*(gained->rel))[i].end;
+			last = gained->rel->record_list[i].end;
 		}
 	}
 	if (last < gained->domainEnd)
@@ -94,22 +94,22 @@ void* set_complement(void* args)
 	// set complement
 	for (uint32_t i = (*gained->borders)[gained->group_id].position_start; i <= (*gained->borders)[gained->group_id].position_end; i++)
 	{
-		if (last < (*(gained->rel))[i].start)
+		if (last < gained->rel->record_list[i].start)
 		{
 			write_flag = true;
-			(*(gained->complement))[point_to_write] = ExtendedRecord(last, (*(gained->rel))[i].start, gained->group1, gained->group2);
-			last = (*(gained->rel))[i].end;
+			gained->complement->record_list[point_to_write] = ExtendedRecord(last, gained->rel->record_list[i].start, gained->group1, gained->group2);
+			last = gained->rel->record_list[i].end;
 			point_to_write++;
 		}
-		else if (last < (*(gained->rel))[i].end)
+		else if (last < gained->rel->record_list[i].end)
 		{
-			last = (*(gained->rel))[i].end;
+			last = gained->rel->record_list[i].end;
 		}
 	}
 	if (last < gained->domainEnd)
 	{
 		write_flag = true;
-		(*(gained->complement))[point_to_write] = ExtendedRecord(last, gained->domainEnd, gained->group1, gained->group2);
+		gained->complement->record_list[point_to_write] = ExtendedRecord(last, gained->domainEnd, gained->group1, gained->group2);
 		point_to_write++;
 	}
 
@@ -158,6 +158,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 
 	///////////////////////////////// find the size of complement /////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////
+
 	fill( jobsList.begin(), jobsList.end(), 1);
 	current_group_id = 0;
 	for (auto& b : borders)
@@ -199,10 +200,12 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		total += each_group_sizes[i];
 		each_group_sizes[i] = previous_total;
 	}
-	complement.resize(total);
+	complement.record_list = (ExtendedRecord*) malloc( total * sizeof(ExtendedRecord) );
+	complement.numRecords = total;
 
 	/////////////////////////////////////// set complement /////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////
+
 	fill( jobsList.begin(), jobsList.end(), 1);
 	current_group_id = 0;
 	for (auto& b : borders)
@@ -219,6 +222,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].domainEnd = domainEnd;
 		toPass[threadId].rel = &R;
 		toPass[threadId].borders = &borders;
+		toPass[threadId].each_group_sizes = &each_group_sizes;
 		toPass[threadId].complement = &complement;
 		toPass[threadId].borders_complement = &borders_complement;
 		toPass[threadId].group_id = current_group_id;
@@ -239,6 +243,6 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 
 	#ifdef TIMES
 	double timeComplement = tim.stop();
-	std::cout << "Complement time: " << timeComplement << " and size " << complement.size() << std::endl;
+	std::cout << "Complement time: " << timeComplement << " and size " << complement.numRecords << std::endl;
 	#endif
 }

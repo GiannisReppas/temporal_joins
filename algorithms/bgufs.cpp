@@ -38,17 +38,17 @@ bool CompareByEnd(const Record& lhs, const Record& rhs)
 // Internal loops //
 ////////////////////
 
-inline unsigned long long bguFS_InternalLoop(Group &G, RelationIterator firstFS, RelationIterator lastFS, const BucketIndex &BI, Timestamp minStart)
+inline unsigned long long bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, const BucketIndex &BI, Timestamp minStart)
 {
 	unsigned long long result = 0;
 	long int cbucket_id, pbucket_id;
 	
 	
-	auto pivot = firstFS;
-	auto lastG = G.end();
-	for (auto curr = G.begin(); curr != lastG; curr++)
+	Record* pivot = firstFS;
+	Record* lastG = G.record_list + G.numRecords;
+	for (Record* curr = G.record_list; curr != lastG; curr++)
 	{
-		auto bufferSize = (lastG-curr);
+		auto bufferSize = ((lastG-curr) / sizeof(Record*));
 		
 		if (pivot == lastFS)
 			break;
@@ -64,7 +64,7 @@ inline unsigned long long bguFS_InternalLoop(Group &G, RelationIterator firstFS,
 		
 		if (cbucket_id > pbucket_id)
 		{
-			auto last = BI[cbucket_id-1].last;
+			Record* last = BI.bucket_list[cbucket_id-1].last;
 			switch (bufferSize)
 			{
 				case 1:
@@ -1328,7 +1328,7 @@ inline unsigned long long bguFS_InternalLoop(Group &G, RelationIterator firstFS,
 		}
 		
 		// Sweep the last bucket.
-		auto last = BI[cbucket_id].last;
+		auto last = BI.bucket_list[cbucket_id].last;
 		switch (bufferSize)
 		{
 			case 1:
@@ -2602,12 +2602,12 @@ inline unsigned long long bguFS_InternalLoop(Group &G, RelationIterator firstFS,
 unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS)
 {
 	unsigned long long result = 0;
-	auto r = R.begin();
-	auto s = S.begin();
-	auto lastR = R.end();
-	auto lastS = S.end();
+	Record* r = R.record_list;
+	Record* s = S.record_list;
+	Record* lastR = R.record_list + R.numRecords;
+	Record* lastS = S.record_list + S.numRecords;
 	Group GR, GS;
-	
+	size_t i;
 	
 	while ((r < lastR) && (s < lastS))
 	{
@@ -2616,39 +2616,56 @@ unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex
 			// Step 1: gather group for R.
 			while ((r < lastR) && (r->start < s->start))
 			{
-				GR.emplace_back(r->start, r->end);
+				GR.numRecords++;
 				r++;
 			}
-			
+			r -= GR.numRecords;
+			GR.record_list = (Record*) malloc(GR.numRecords*sizeof(Record));
+			i = 0;
+			while ((r < lastR) && (r->start < s->start))
+			{
+				GR.record_list[i++] = Record(r->start, r->end);
+				r++;
+			}
+
 			// Sort current group by end point.
-			std::sort( GR.begin(), GR.end(), CompareByEnd);
-			
+			std::sort( &GR.record_list[0], &GR.record_list[0] + GR.numRecords, CompareByEnd);
+
 			// Step 2: run internal loop.
 			result += bguFS_InternalLoop(GR, s, lastS, BIS, S.minStart);
 
-
 			// Step 3: empty current group.
-			GR.clear();
+			free(GR.record_list);
+			GR.record_list = NULL;
+			GR.numRecords = 0;
 		}
 		else
 		{
 			// Step 1: gather group for S.
 			while ((s < lastS) && (r->start >= s->start))
 			{
-				GS.emplace_back(s->start, s->end);
+				GS.numRecords++;
 				s++;
 			}
-			
+			s -= GS.numRecords;
+			GS.record_list = (Record*) malloc(GS.numRecords*sizeof(Record));
+			i = 0;
+			while ((s < lastS) && (r->start >= s->start))
+			{
+				GS.record_list[i++] = Record(s->start, s->end);
+				s++;
+			}
+
 			// Sort current group by end point.
-			std::sort( GS.begin(), GS.end(), CompareByEnd );
-			
-			
+			std::sort( &GS.record_list[0], &GS.record_list[0] + GS.numRecords, CompareByEnd);
+
 			// Step 2: run internal loop.
 			result += bguFS_InternalLoop(GS, r, lastR, BIR, R.minStart);
 
-			
 			// Step 3: empty current group.
-			GS.clear();
+			free(GS.record_list);
+			GS.record_list = NULL;
+			GS.numRecords = 0;
 		}
 	}
 	

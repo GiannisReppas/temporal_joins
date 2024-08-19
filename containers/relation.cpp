@@ -50,8 +50,12 @@ ExtendedRecord::~ExtendedRecord()
 
 ExtendedRelation::ExtendedRelation()
 {
+	this->record_list = NULL;
+
 	this->minStart = std::numeric_limits<Timestamp>::max();
 	this->maxEnd   = std::numeric_limits<Timestamp>::min();
+
+	this->numRecords = 0;
 }
 
 void ExtendedRelation::load(const char *filename)
@@ -59,7 +63,6 @@ void ExtendedRelation::load(const char *filename)
 	Timestamp start, end;
 	uint32_t group1, group2;
 	std::ifstream inp(filename);
-
 	if (!inp)
 	{
 		std::cout << "error - cannot open file " << filename << std::endl;
@@ -68,16 +71,30 @@ void ExtendedRelation::load(const char *filename)
 
 	while (inp >> start >> end >> group1 >> group2)
 	{
-		this->emplace_back(start, end, group1, group2);
+		this->numRecords++;
+	}
+	this->record_list = (ExtendedRecord*) malloc(sizeof(ExtendedRecord)*this->numRecords);
+	inp.close();
+
+	inp.open(filename);
+	size_t i = 0;
+	while (i < this->numRecords)
+	{
+		inp >> start >> end >> group1 >> group2;
+
+		this->record_list[i] = ExtendedRecord(start, end, group1, group2);
 
 		this->minStart = std::min(this->minStart, start);
 		this->maxEnd   = std::max(this->maxEnd  , end);
+
+		i++;
 	}
 	inp.close();
 }
 
 ExtendedRelation::~ExtendedRelation()
 {
+	free( this->record_list );
 }
 
 /**************************************************************************************************/
@@ -114,23 +131,29 @@ Relation::Relation()
 	this->maxStart = std::numeric_limits<Timestamp>::min();
 	this->minEnd   = std::numeric_limits<Timestamp>::max();
 	this->maxEnd   = std::numeric_limits<Timestamp>::min();
+
+	this->record_list = NULL;
+	this->numRecords = 0;
 }
 
 void Relation::load(const ExtendedRelation& I, size_t from, size_t till)
 {
+	this->record_list = (Record*) malloc( (till - from + 1) * sizeof(Record) );
+
 	for (size_t i = from; i <= till; i++)
 	{
-		this->emplace_back(I[i].start, I[i].end);
+		this->record_list[i - from] = Record(I.record_list[i].start, I.record_list[i].end);
 
-		this->minStart = std::min(this->minStart, I[i].start);
-		this->maxStart = std::max(this->maxStart, I[i].start);
-		this->minEnd   = std::min(this->minEnd  , I[i].end);
-		this->maxEnd   = std::max(this->maxEnd  , I[i].end);
+		this->minStart = std::min(this->minStart, I.record_list[i].start);
+		this->maxStart = std::max(this->maxStart, I.record_list[i].start);
+		this->minEnd   = std::min(this->minEnd  , I.record_list[i].end);
+		this->maxEnd   = std::max(this->maxEnd  , I.record_list[i].end);
 	}
 
-	this->numRecords = this->size();
+	this->numRecords = till - from + 1;
 }
 
 Relation::~Relation()
 {
+	free( this->record_list );
 }

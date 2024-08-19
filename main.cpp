@@ -139,7 +139,7 @@ unsigned long long extended_temporal_join( ExtendedRelation& exR, Borders& borde
 				result += it_exR->position_end - it_exR->position_start + 1;
 #else
 				for (uint32_t i=it_exR->position_start; i < it_exR->position_end ; i++)
-					result += domainStart ^ exR[i].start;
+					result += domainStart ^ exR.record_list[i].start;
 #endif
 			}
 
@@ -224,17 +224,10 @@ int main(int argc, char **argv)
 
 	// Load inputs
 	ExtendedRelation exR, exS;
-	#pragma omp parallel sections
-	{
-		#pragma omp section
-		{
-			exR.load(argv[optind]);
-		}
-		#pragma omp section
-		{
-			exS.load(argv[optind+1]);
-		}
-	}
+	exR.load(argv[optind]);
+	printf("R loaded\n");
+	exS.load(argv[optind+1]);
+	printf("S loaded\n\n");
 
 	auto totalStartTime = std::chrono::steady_clock::now();
 
@@ -243,8 +236,8 @@ int main(int argc, char **argv)
 	Timer tim;
 	tim.start();
 	#endif
-	std::sort( exR.begin(), exR.end(), sortByGroupAndStartPoint);
-	std::sort( exS.begin(), exS.end(), sortByGroupAndStartPoint);
+	std::sort( &exR.record_list[0], &exR.record_list[0] + exR.numRecords, sortByGroupAndStartPoint);
+	std::sort( &exS.record_list[0], &exS.record_list[0] + exS.numRecords, sortByGroupAndStartPoint);
 
 	#ifdef TIMES
 	double timeSorting = tim.stop();
