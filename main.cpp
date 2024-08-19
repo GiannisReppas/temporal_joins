@@ -28,7 +28,7 @@
 
 #include "getopt.h"
 #include "def.hpp"
-#include "containers/borders.hpp"
+#include "containers/borders_element.hpp"
 #include "containers/relation.hpp"
 #include "containers/bucket_index.hpp"
 
@@ -60,13 +60,14 @@ bool sortByGroupAndStartPoint( ExtendedRecord a, ExtendedRecord b)
 
 struct structForParallelFS
 {
-	uint32_t threadId;						// thread id
 	ExtendedRelation* exR;					// relation R with non-temporal values
 	ExtendedRelation* exS;					// relation S with non-temporal values
 	uint32_t R_start;					// start position to run bguFS from exR
 	uint32_t R_end;						// end position to run bguFS from exR
 	uint32_t S_start;					// start position to run bguFS from exS
 	uint32_t S_end;						// end position to run bguFS from exS
+
+	uint32_t threadId;						// thread id
 	uint64_t* thread_results;	// array that keeps the results of each thread
 	uint32_t* jobsList;			// list of threads - needs to be updated at the end of the computation
 };
@@ -108,8 +109,11 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 {
 	#ifdef TIMES
 	Timer tim;
+	tim.start();
 	#endif
 
+	// variables required for master-slave thread scheduling
+	uint64_t result = 0;
 	uint64_t* thread_results = (uint64_t*) malloc( runNumThreads*sizeof(uint64_t) );
 	uint32_t* jobsList = (uint32_t*) malloc( runNumThreads*sizeof(uint32_t) );
 	for (uint32_t i = 0; i < runNumThreads; i++)
@@ -117,15 +121,10 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 		jobsList[i] = 1;
 		thread_results[i] = 0;
 	}
-	uint64_t result = 0;
 	structForParallelFS toPass[runNumThreads];
 	pthread_t threads[runNumThreads];
 	uint32_t threadId;
 	bool needsDetach;
-
-	#ifdef TIMES
-	tim.start();
-	#endif
 
 	// loop through Relations existing in ExtendedRelations
 	Timestamp domainStart = std::min(exR.minStart, exS.minStart);
@@ -162,15 +161,17 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 					if (pthread_detach(threads[threadId]))
 						printf("Whoops\n");
 
-				toPass[threadId].threadId = threadId;
 				toPass[threadId].exR = &exR;
 				toPass[threadId].exS = &exS;
 				toPass[threadId].R_start = it_exR->position_start;
 				toPass[threadId].R_end = it_exR->position_end;
 				toPass[threadId].S_start = it_exS->position_start;
 				toPass[threadId].S_end = it_exS->position_end;
+
+				toPass[threadId].threadId = threadId;
 				toPass[threadId].jobsList = jobsList;
 				toPass[threadId].thread_results = thread_results;
+				
 				pthread_create( &threads[threadId], NULL, worker_bguFS, &toPass[threadId]);
 			}
 
@@ -184,16 +185,16 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 				pthread_join( threads[i], NULL);
 	}
 
-	#ifdef TIMES
-	double timeInnerJoin = tim.stop();
-	std::cout << "Inner Join time: " << timeInnerJoin << std::endl;
-	#endif
-
 	for (uint32_t i = 0; i < runNumThreads; i++)
 		result += thread_results[i];
 
 	free( thread_results );
 	free( jobsList );
+
+	#ifdef TIMES
+	double timeInnerJoin = tim.stop();
+	std::cout << "Inner Join time: " << timeInnerJoin << std::endl;
+	#endif
 
 	return result;
 }
@@ -229,11 +230,19 @@ int main(int argc, char **argv)
 	}
 
 	// Load inputs
+	// Use 2 parallel threads
 	ExtendedRelation exR, exS;
-	exR.load(argv[optind]);
-	printf("R loaded\n");
-	exS.load(argv[optind+1]);
-	printf("S loaded\n\n");
+	pthread_t thread_id[2];
+	struct LoadRelationStructure lrs[2];
+	lrs[0].rel = &exR;
+	lrs[0].filename = argv[ optind ];
+	lrs[1].rel = &exS;
+	lrs[1].filename = argv[ optind+1 ];
+	pthread_create( &thread_id[0], NULL, &ExtendedRelation::load_helper, (void*) &lrs[0]);
+	pthread_create( &thread_id[1], NULL, &ExtendedRelation::load_helper, (void*) &lrs[1]);
+	pthread_join( thread_id[0], NULL);
+	pthread_join( thread_id[1], NULL);
+	printf("Relations loaded.\n\n");
 
 	auto totalStartTime = std::chrono::steady_clock::now();
 

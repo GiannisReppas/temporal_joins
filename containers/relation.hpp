@@ -31,6 +31,13 @@
 
 #include "../def.hpp"
 
+class ExtendedRelation;
+struct LoadRelationStructure
+{
+	ExtendedRelation* rel;
+	const char* filename;
+};
+
 class ExtendedRecord
 {
 public:
@@ -53,6 +60,14 @@ public:
 
 	ExtendedRelation();
 	void load(const char *filename);
+	static void *load_helper(void* args)
+	{
+		LoadRelationStructure *gained = (LoadRelationStructure*) args;
+
+		gained->rel->load(gained->filename);
+
+		return NULL;
+	}
 	~ExtendedRelation();
 };
 

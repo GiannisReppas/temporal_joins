@@ -27,15 +27,13 @@
  ******************************************************************************/
 
 #include "../containers/relation.hpp"
-#include "../containers/borders.hpp"
+#include "../containers/borders_element.hpp"
 
 // used to get the id of an available thread
 uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize);
 
 struct structForParallelComplement
 {
-	uint32_t c;				// number of threads
-	uint32_t chunk;				// thread id [0,c)
 	Timestamp domainStart;			// domainStart value, which is needed for 1st complement tuple
 	Timestamp domainEnd;			// domainEnd value, which is needed for last complement tuple
 	ExtendedRelation* rel;			// relation to compute its complement
@@ -46,6 +44,9 @@ struct structForParallelComplement
 	uint32_t group_id;			// id of current group [0,groups_num-1]
 	uint32_t group1;			// group1 value to compute complement
 	uint32_t group2;			// group2 value to compute complement
+
+	uint32_t runNumThreads;				// number of threads
+	uint32_t chunk;				// thread id [0,c)
 	uint32_t* jobsList;	// list of threads - needs to be updated at the end of the computation
 };
 
@@ -136,18 +137,18 @@ void* set_complement(void* args)
 }
 
 void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelation& complement, Borders& borders_complement,
-							Timestamp foreignStart, Timestamp foreignEnd, uint32_t c)
+							Timestamp foreignStart, Timestamp foreignEnd, uint32_t runNumThreads)
 {
 	#ifdef TIMES
 	Timer tim;
 	tim.start();
 	#endif
 
-	structForParallelComplement toPass[c];
-	pthread_t threads[c];
+	structForParallelComplement toPass[runNumThreads];
+	pthread_t threads[runNumThreads];
 	bool needsDetach;
 	uint32_t threadId;
-	uint32_t* jobsList = (uint32_t*) malloc( c * sizeof(uint32_t) );
+	uint32_t* jobsList = (uint32_t*) malloc( runNumThreads * sizeof(uint32_t) );
 
 	// variables used for the commplement computation
 	Timestamp domainStart = std::min( foreignStart, R.minStart);
@@ -161,19 +162,17 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 	///////////////////////////////// find the size of complement /////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	for (uint32_t i = 0; i < c; i++)
+	for (uint32_t i = 0; i < runNumThreads; i++)
 		jobsList[i] = 1;
 	current_group_id = 0;
 	for (auto& b : borders)
 	{
 		needsDetach = false;
-		threadId = getThreadId(needsDetach, jobsList, c);
+		threadId = getThreadId(needsDetach, jobsList, runNumThreads);
 		if (needsDetach)
 			if (pthread_detach(threads[threadId]))
 				printf("Whoops\n");
 
-		toPass[threadId].c = c;
-		toPass[threadId].chunk = threadId;
 		toPass[threadId].domainStart = domainStart;
 		toPass[threadId].domainEnd = domainEnd;
 		toPass[threadId].rel = &R;
@@ -182,13 +181,17 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].group_id = current_group_id;
 		toPass[threadId].group1 = b.group1;
 		toPass[threadId].group2 = b.group2;
+
+		toPass[threadId].runNumThreads = runNumThreads;
+		toPass[threadId].chunk = threadId;
 		toPass[threadId].jobsList = jobsList;
+
 		pthread_create( &threads[threadId], NULL, find_complement_sizes, &toPass[threadId]);
 
 		// next group
 		current_group_id++;
 	}
-	for (uint32_t i=0; i < c; i++)
+	for (uint32_t i=0; i < runNumThreads; i++)
 	{
 		if (jobsList[i] != 1)
 			pthread_join( threads[i], NULL);
@@ -209,19 +212,17 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 	/////////////////////////////////////// set complement /////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-	for (uint32_t i = 0; i < c; i++)
+	for (uint32_t i = 0; i < runNumThreads; i++)
 		jobsList[i] = 1;
 	current_group_id = 0;
 	for (auto& b : borders)
 	{
 		needsDetach = false;
-		threadId = getThreadId(needsDetach, jobsList, c);
+		threadId = getThreadId(needsDetach, jobsList, runNumThreads);
 		if (needsDetach)
 			if (pthread_detach(threads[threadId]))
 				printf("Whoops\n");
 
-		toPass[threadId].c = c;
-		toPass[threadId].chunk = threadId;
 		toPass[threadId].domainStart = domainStart;
 		toPass[threadId].domainEnd = domainEnd;
 		toPass[threadId].rel = &R;
@@ -232,13 +233,17 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].group_id = current_group_id;
 		toPass[threadId].group1 = b.group1;
 		toPass[threadId].group2 = b.group2;
+
+		toPass[threadId].runNumThreads = runNumThreads;
+		toPass[threadId].chunk = threadId;
 		toPass[threadId].jobsList = jobsList;
+
 		pthread_create( &threads[threadId], NULL, set_complement, &toPass[threadId]);
 
 		// next group
 		current_group_id++;
 	}
-	for (uint32_t i=0; i < c; i++)
+	for (uint32_t i=0; i < runNumThreads; i++)
 	{
 		if (jobsList[i] != 1)
 			pthread_join( threads[i], NULL);

@@ -27,7 +27,7 @@
  ******************************************************************************/
 
 #include "../containers/relation.hpp"
-#include "../containers/borders.hpp"
+#include "../containers/borders_element.hpp"
 
 /*
 helper function -

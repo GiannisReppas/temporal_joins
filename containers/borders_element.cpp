@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-#include "borders.hpp"
+#include "borders_element.hpp"
 
 BordersElement::BordersElement()
 {
