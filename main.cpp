@@ -201,15 +201,48 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 
 int main(int argc, char **argv)
 {
-	uint32_t runNumThreads = 1;
+	uint32_t runNumThreads = 0;
 	uint64_t result = 0;
+	int joinType;
 
 	// Parse and check command line input.
+	if (argc != 7)
+	{
+		printf("Usage: ./ij -j joinType -t threadNum FILE1 FILE2\n");
+		exit(1);
+	}
 	char c;
-	while ((c = getopt(argc, argv, "t:")) != -1)
+	while ((c = getopt(argc, argv, "j:t:")) != -1)
 	{
 		switch (c)
 		{
+			case 'j':
+				if (!strcmp(optarg,"inner"))
+				{
+					joinType = INNER_JOIN;
+				}
+				else if (!strcmp(optarg,"left"))
+				{
+					joinType = LEFT_OUTER_JOIN;
+				}
+				else if (!strcmp(optarg,"right"))
+				{
+					joinType = RIGHT_OUTER_JOIN;
+				}
+				else if (!strcmp(optarg,"full"))
+				{
+					joinType = FULL_OUTER_JOIN;
+				}
+				else if (!strcmp(optarg,"anti"))
+				{
+					joinType = ANTI_JOIN;
+				}
+				else
+				{
+					printf("Unknown Join type provided\n");
+					exit(1);
+				}
+				break;
 			case 't':
 				runNumThreads = atoi(optarg);
 				if (runNumThreads <= 0)
@@ -219,9 +252,19 @@ int main(int argc, char **argv)
 				}
 				break;
 			default:
-				printf("Usage: ./ij -t threadNum FILE1 FILE2\n");
+				printf("Usage: ./ij -j joinType -t threadNum FILE1 FILE2\n");
 				exit(1);
 		}
+	}
+	if (runNumThreads == 0)
+	{
+		printf("No thread num provided\n");
+		exit(1);
+	}
+	if (joinType == -1)
+	{
+		printf("No join type provided\n");
+		exit(1);
 	}
 	if (argc-optind < 2)
 	{
@@ -265,42 +308,49 @@ int main(int argc, char **argv)
 	mainBorders( exR, bordersR, exS, bordersS, runNumThreads);
 
 	// run join
+	if (joinType == INNER_JOIN)
+	{
+		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
+	}
+	else if (joinType == LEFT_OUTER_JOIN)
+	{
+		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
 
-	#if defined(INNER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
+		ExtendedRelation exS_complement;
+		Borders bordersS_complement;
+		convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+		result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
+	}
+	else if (joinType == RIGHT_OUTER_JOIN)
+	{
+		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
 
-	#elif defined(LEFT_OUTER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
-	ExtendedRelation exS_complement;
-	Borders bordersS_complement;
-	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
+		ExtendedRelation exR_complement;
+		Borders bordersR_complement;
+		convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
+		result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
+	}
+	else if (joinType == FULL_OUTER_JOIN)
+	{
+		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
 
-	#elif defined(RIGHT_OUTER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
-	ExtendedRelation exR_complement;
-	Borders bordersR_complement;
-	convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
-
-	#elif defined(FULL_OUTER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
-	ExtendedRelation exS_complement;
-	Borders bordersS_complement;
-	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
-	ExtendedRelation exR_complement;
-	Borders bordersR_complement;
-	convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
-
-	#elif defined(ANTI_JOIN)
-	ExtendedRelation exS_complement;
-	Borders bordersS_complement;
-	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
-
-	#endif
+		ExtendedRelation exS_complement;
+		Borders bordersS_complement;
+		convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+		result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
+		
+		ExtendedRelation exR_complement;
+		Borders bordersR_complement;
+		convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
+		result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
+	}
+	else if (joinType == ANTI_JOIN)
+	{
+		ExtendedRelation exS_complement;
+		Borders bordersS_complement;
+		convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+		result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
+	}
 
 	// Report stats
 	auto totalEndTime = std::chrono::steady_clock::now();

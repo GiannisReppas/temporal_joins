@@ -40,17 +40,18 @@
 #include <cmath>
 #include <unistd.h>
 #include <pthread.h>
+#include <cstring>
 
 /* LOGGING PARAMETERS */
 #define TIMES
 #define WORKLOAD_COUNT
 
-/* JOIN TYPES - DEFINE ONLY 1 */
-//#define INNER_JOIN
-//#define LEFT_OUTER_JOIN
-//#define RIGHT_OUTER_JOIN
-//#define FULL_OUTER_JOIN
-#define ANTI_JOIN
+/* JOIN TYPES */
+#define INNER_JOIN 0
+#define LEFT_OUTER_JOIN 1
+#define RIGHT_OUTER_JOIN 2
+#define FULL_OUTER_JOIN 3
+#define ANTI_JOIN 4
 
 typedef unsigned long long Timestamp;
 
