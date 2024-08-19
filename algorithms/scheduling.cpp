@@ -37,20 +37,20 @@ Each thread has 3 different states:
 	2 --> thread is available and needs to be detached to be used again
 boolean varriable needsDetach has to be used to inform the caller about the need to be detached
 */
-uint32_t getThreadId(bool& needsDetach, std::vector<uint32_t>& jobs)
+uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize)
 {
 	uint32_t i=0;
 	while(true)
 	{
-		if (jobs[i] != 0)
+		if (jobsList[i] != 0)
 		{
-			if (jobs[i] == 2)
+			if (jobsList[i] == 2)
 				needsDetach = true;
-			jobs[i] = 0;
+			jobsList[i] = 0;
 			break;
 		}
 
-		i == (jobs.size() - 1) ? i = 0: i++;
+		i == (jobsListSize - 1) ? i = 0: i++;
 	}
 
 	return i;

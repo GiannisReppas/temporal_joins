@@ -40,10 +40,10 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 							Timestamp foreignStart, Timestamp foreignEnd, uint32_t c);
 
 // bguFS
-unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
+uint64_t bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
 
 // used to get the id of an available thread
-uint32_t getThreadId(bool& needsDetach, std::vector<uint32_t>& jobs);
+uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize);
 
 /* code */
 
@@ -67,8 +67,8 @@ struct structForParallelFS
 	uint32_t R_end;						// end position to run bguFS from exR
 	uint32_t S_start;					// start position to run bguFS from exS
 	uint32_t S_end;						// end position to run bguFS from exS
-	std::vector<unsigned long long>* thread_results;	// array that keeps the results of each thread
-	std::vector<uint32_t>* jobsList;			// list of threads - needs to be updated at the end of the computation
+	uint64_t* thread_results;	// array that keeps the results of each thread
+	uint32_t* jobsList;			// list of threads - needs to be updated at the end of the computation
 };
 
 void* worker_bguFS(void* args)
@@ -95,30 +95,33 @@ void* worker_bguFS(void* args)
 	BIR.build(R, 1000);
 	BIS.build(S, 1000);
 
-	(*(gained->thread_results))[ gained->threadId ] += bguFS(R, S, BIR, BIS);
+	gained->thread_results[ gained->threadId ] += bguFS(R, S, BIR, BIS);
 
 	// make current thread free to be used for next group
-	(*(gained->jobsList))[ gained->threadId ] = 2;
+	gained->jobsList[ gained->threadId ] = 2;
 
 	return NULL;
 }
 
-unsigned long long extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, ExtendedRelation& exS, Borders& bordersS,
-										   uint32_t runNumThreads, std::vector<uint32_t>& jobsList, std::vector<unsigned long long>& thread_results,
-										   bool outerFlag)
+uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, ExtendedRelation& exS, Borders& bordersS,
+										   uint32_t runNumThreads, bool outerFlag)
 {
 	#ifdef TIMES
 	Timer tim;
 	#endif
 
-	fill( thread_results.begin(), thread_results.end(), 0);
-	unsigned long long result = 0;
-
+	uint64_t* thread_results = (uint64_t*) malloc( runNumThreads*sizeof(uint64_t) );
+	uint32_t* jobsList = (uint32_t*) malloc( runNumThreads*sizeof(uint32_t) );
+	for (uint32_t i = 0; i < runNumThreads; i++)
+	{
+		jobsList[i] = 1;
+		thread_results[i] = 0;
+	}
+	uint64_t result = 0;
 	structForParallelFS toPass[runNumThreads];
 	pthread_t threads[runNumThreads];
 	uint32_t threadId;
 	bool needsDetach;
-	fill( jobsList.begin(), jobsList.end(), 1);
 
 	#ifdef TIMES
 	tim.start();
@@ -154,7 +157,7 @@ unsigned long long extended_temporal_join( ExtendedRelation& exR, Borders& borde
 			if ( (it_exS->position_start != 1) || (it_exS->position_end != 0) )
 			{
 				needsDetach = false;
-				threadId = getThreadId(needsDetach, jobsList);
+				threadId = getThreadId(needsDetach, jobsList, runNumThreads);
 				if (needsDetach)
 					if (pthread_detach(threads[threadId]))
 						printf("Whoops\n");
@@ -166,8 +169,8 @@ unsigned long long extended_temporal_join( ExtendedRelation& exR, Borders& borde
 				toPass[threadId].R_end = it_exR->position_end;
 				toPass[threadId].S_start = it_exS->position_start;
 				toPass[threadId].S_end = it_exS->position_end;
-				toPass[threadId].jobsList = &jobsList;
-				toPass[threadId].thread_results = &thread_results;
+				toPass[threadId].jobsList = jobsList;
+				toPass[threadId].thread_results = thread_results;
 				pthread_create( &threads[threadId], NULL, worker_bguFS, &toPass[threadId]);
 			}
 
@@ -186,8 +189,11 @@ unsigned long long extended_temporal_join( ExtendedRelation& exR, Borders& borde
 	std::cout << "Inner Join time: " << timeInnerJoin << std::endl;
 	#endif
 
-	for (auto& r : thread_results)
-		result += r;
+	for (uint32_t i = 0; i < runNumThreads; i++)
+		result += thread_results[i];
+
+	free( thread_results );
+	free( jobsList );
 
 	return result;
 }
@@ -195,7 +201,7 @@ unsigned long long extended_temporal_join( ExtendedRelation& exR, Borders& borde
 int main(int argc, char **argv)
 {
 	uint32_t runNumThreads = 1;
-	unsigned long long result = 0;
+	uint64_t result = 0;
 
 	// Parse and check command line input.
 	char c;
@@ -250,42 +256,40 @@ int main(int argc, char **argv)
 	mainBorders( exR, bordersR, exS, bordersS, runNumThreads);
 
 	// run join
-	std::vector<unsigned long long> thread_results(runNumThreads);
-	std::vector<uint32_t> jobsList( runNumThreads);
 
 	#if defined(INNER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, false);
+	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
 
 	#elif defined(LEFT_OUTER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, false);
+	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
 	ExtendedRelation exS_complement;
 	Borders bordersS_complement;
 	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, jobsList, thread_results, true);
+	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
 
 	#elif defined(RIGHT_OUTER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, false);
+	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
 	ExtendedRelation exR_complement;
 	Borders bordersR_complement;
 	convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, jobsList, thread_results, true);
+	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
 
 	#elif defined(FULL_OUTER_JOIN)
-	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, jobsList, thread_results, false);
+	result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
 	ExtendedRelation exS_complement;
 	Borders bordersS_complement;
 	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, jobsList, thread_results, true);
+	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
 	ExtendedRelation exR_complement;
 	Borders bordersR_complement;
 	convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, jobsList, thread_results, true);
+	result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
 
 	#elif defined(ANTI_JOIN)
 	ExtendedRelation exS_complement;
 	Borders bordersS_complement;
 	convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, jobsList, thread_results, true);
+	result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
 
 	#endif
 

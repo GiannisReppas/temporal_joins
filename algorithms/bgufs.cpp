@@ -38,9 +38,9 @@ bool CompareByEnd(const Record& lhs, const Record& rhs)
 // Internal loops //
 ////////////////////
 
-inline unsigned long long bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, const BucketIndex &BI, Timestamp minStart)
+inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, const BucketIndex &BI, Timestamp minStart)
 {
-	unsigned long long result = 0;
+	uint64_t result = 0;
 	long int cbucket_id, pbucket_id;
 	
 	
@@ -2599,9 +2599,9 @@ inline unsigned long long bguFS_InternalLoop(Group &G, Record* firstFS, Record* 
 // Single-thread processing //
 //////////////////////////////
 
-unsigned long long bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS)
+uint64_t bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS)
 {
-	unsigned long long result = 0;
+	uint64_t result = 0;
 	Record* r = R.record_list;
 	Record* s = S.record_list;
 	Record* lastR = R.record_list + R.numRecords;
