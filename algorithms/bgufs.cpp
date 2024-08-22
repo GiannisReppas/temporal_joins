@@ -47,7 +47,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 	Record* lastG = G.record_list + G.numRecords;
 	for (Record* curr = G.record_list; curr != lastG; curr++)
 	{
-		uint32_t bufferSize = (lastG-curr) / sizeof(Record);
+		long int bufferSize = lastG-curr;
 
 		if (pivot == lastFS)
 			break;
@@ -1325,7 +1325,22 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					break;
 			}
 		}
-
+/*
+		// Sweep the last bucket.
+		Record* last = BI.bucket_list[cbucket_id].last;
+		while ((pivot != last) && (curr->end > pivot->start))
+		{
+			for (Record* k = curr; k != lastG; k++)
+			{
+#ifdef WORKLOAD_COUNT
+				result += 1;
+#else
+				result += k->start ^ pivot->start;
+#endif
+			}
+			pivot++;
+		}
+*/
 		// Sweep the last bucket.
 		Record* last = BI.bucket_list[cbucket_id].last;
 		switch (bufferSize)
@@ -1474,32 +1489,11 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
 #ifdef WORKLOAD_COUNT
-					result += 24;
+					result += 3;
 #else
 					result += (curr+0)->start ^ (pivot+0)->start;
 					result += (curr+1)->start ^ (pivot+0)->start;
 					result += (curr+2)->start ^ (pivot+0)->start;
-					result += (curr+0)->start ^ (pivot+1)->start;
-					result += (curr+1)->start ^ (pivot+1)->start;
-					result += (curr+2)->start ^ (pivot+1)->start;
-					result += (curr+0)->start ^ (pivot+2)->start;
-					result += (curr+1)->start ^ (pivot+2)->start;
-					result += (curr+2)->start ^ (pivot+2)->start;
-					result += (curr+0)->start ^ (pivot+3)->start;
-					result += (curr+1)->start ^ (pivot+3)->start;
-					result += (curr+2)->start ^ (pivot+3)->start;
-					result += (curr+0)->start ^ (pivot+4)->start;
-					result += (curr+1)->start ^ (pivot+4)->start;
-					result += (curr+2)->start ^ (pivot+4)->start;
-					result += (curr+0)->start ^ (pivot+5)->start;
-					result += (curr+1)->start ^ (pivot+5)->start;
-					result += (curr+2)->start ^ (pivot+5)->start;
-					result += (curr+0)->start ^ (pivot+6)->start;
-					result += (curr+1)->start ^ (pivot+6)->start;
-					result += (curr+2)->start ^ (pivot+6)->start;
-					result += (curr+0)->start ^ (pivot+7)->start;
-					result += (curr+1)->start ^ (pivot+7)->start;
-					result += (curr+2)->start ^ (pivot+7)->start;
 #endif
 					pivot++;
 				}
@@ -2609,13 +2603,13 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 				}
 				break;
 		}
-	}
 
+	}
 
 	return result;
 }
 
-/*
+
 inline uint64_t bgFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, const BucketIndex &BI, Timestamp minStart)
 {
 	uint64_t result = 0;
@@ -2672,7 +2666,7 @@ inline uint64_t bgFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, con
 
 	return result;
 }
-*/
+
 
 //////////////////////////////
 // Single-thread processing //
