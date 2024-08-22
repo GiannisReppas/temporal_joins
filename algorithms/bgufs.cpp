@@ -42,26 +42,25 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 {
 	uint64_t result = 0;
 	long int cbucket_id, pbucket_id;
-	
-	
+
 	Record* pivot = firstFS;
 	Record* lastG = G.record_list + G.numRecords;
 	for (Record* curr = G.record_list; curr != lastG; curr++)
 	{
-		auto bufferSize = ((lastG-curr) / sizeof(Record*));
-		
+		uint32_t bufferSize = (lastG-curr) / sizeof(Record);
+
 		if (pivot == lastFS)
 			break;
 		if (curr->end < minStart)
 			continue;
-		
+
 		cbucket_id = ceil((double)(curr->end-minStart)/BI.bucket_range);
 		if (cbucket_id >= BI.numBuckets)
 			cbucket_id = BI.numBuckets-1;
 		pbucket_id = ceil((double)(pivot->end-minStart)/BI.bucket_range);
 		if (pbucket_id >= BI.numBuckets)
 			pbucket_id = BI.numBuckets-1;
-		
+
 		if (cbucket_id > pbucket_id)
 		{
 			Record* last = BI.bucket_list[cbucket_id-1].last;
@@ -108,7 +107,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						pivot += 32;
 					}
-					
+
 					while (pivot < last)
 					{
 #ifdef WORKLOAD_COUNT
@@ -119,7 +118,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 2:
 					while (last-pivot >= 16)
 					{
@@ -161,7 +160,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						pivot += 16;
 					}
-					
+
 					while (pivot < last)
 					{
 #ifdef WORKLOAD_COUNT
@@ -173,7 +172,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 3:
 					while (last-pivot >= 8)
 					{
@@ -207,7 +206,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						pivot += 8;
 					}
-					
+
 					while (pivot < last)
 					{
 #ifdef WORKLOAD_COUNT
@@ -220,7 +219,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 4:
 					while (last-pivot >= 8)
 					{
@@ -262,7 +261,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						pivot += 8;
 					}
-					
+
 					while (pivot < last)
 					{
 #ifdef WORKLOAD_COUNT
@@ -276,7 +275,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 5:
 					while (pivot < last)
 					{
@@ -292,7 +291,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 6:
 					while (pivot < last)
 					{
@@ -309,7 +308,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 7:
 					while (pivot < last)
 					{
@@ -327,7 +326,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 8:
 					while (pivot < last)
 					{
@@ -346,7 +345,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 9:
 					while (pivot < last)
 					{
@@ -366,7 +365,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 10:
 					while (pivot < last)
 					{
@@ -387,7 +386,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 11:
 					while (pivot < last)
 					{
@@ -409,7 +408,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 12:
 					while (pivot < last)
 					{
@@ -432,7 +431,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 13:
 					while (pivot < last)
 					{
@@ -456,7 +455,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 14:
 					while (pivot < last)
 					{
@@ -481,7 +480,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 15:
 					while (pivot < last)
 					{
@@ -507,7 +506,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 16:
 					while (pivot < last)
 					{
@@ -534,7 +533,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 17:
 					while (pivot < last)
 					{
@@ -562,7 +561,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 18:
 					while (pivot < last)
 					{
@@ -591,7 +590,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 19:
 					while (pivot < last)
 					{
@@ -621,7 +620,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 20:
 					while (pivot < last)
 					{
@@ -652,7 +651,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 21:
 					while (pivot < last)
 					{
@@ -684,7 +683,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 22:
 					while (pivot < last)
 					{
@@ -717,7 +716,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 23:
 					while (pivot < last)
 					{
@@ -751,7 +750,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 24:
 					while (pivot < last)
 					{
@@ -786,7 +785,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 25:
 					while (pivot < last)
 					{
@@ -822,7 +821,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 26:
 					while (pivot < last)
 					{
@@ -859,7 +858,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 27:
 					while (pivot < last)
 					{
@@ -897,7 +896,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 28:
 					while (pivot < last)
 					{
@@ -936,7 +935,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 29:
 					while (pivot < last)
 					{
@@ -976,7 +975,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 30:
 					while (pivot < last)
 					{
@@ -1017,7 +1016,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 31:
 					while (pivot < last)
 					{
@@ -1059,7 +1058,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				case 32:
 					while (pivot < last)
 					{
@@ -1102,11 +1101,11 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						pivot++;
 					}
 					break;
-					
+
 				default:
 					while (last-pivot >= 32)
 					{
-						for (auto k = curr; k != lastG; k++)
+						for (Record* k = curr; k != lastG; k++)
 						{
 #ifdef WORKLOAD_COUNT
 							result += 32;
@@ -1147,10 +1146,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						}
 						pivot += 32;
 					}
-					
+
 					if (last-pivot >= 16)
 					{
-						for (auto k = curr; k != lastG; k++)
+						for (Record* k = curr; k != lastG; k++)
 						{
 #ifdef WORKLOAD_COUNT
 							result += 16;
@@ -1175,10 +1174,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						}
 						pivot += 16;
 					}
-					
+
 					if (last-pivot >= 8)
 					{
-						for (auto k = curr; k != lastG; k++)
+						for (Record* k = curr; k != lastG; k++)
 						{
 #ifdef WORKLOAD_COUNT
 							result += 8;
@@ -1195,10 +1194,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						}
 						pivot += 8;
 					}
-					
+
 					if (last-pivot >= 4)
 					{
-						for (auto k = curr; k != lastG; k++)
+						for (Record* k = curr; k != lastG; k++)
 						{
 #ifdef WORKLOAD_COUNT
 							result += 4;
@@ -1211,10 +1210,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 						}
 						pivot += 4;
 					}
-					
+
 					while (pivot < last)
 					{
-						auto k = curr;
+						Record* k = curr;
 						while (lastG-k >= 32)
 						{
 #ifdef WORKLOAD_COUNT
@@ -1255,7 +1254,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 							k += 32;
 						}
-						
+
 						if (lastG-k >= 16)
 						{
 #ifdef WORKLOAD_COUNT
@@ -1280,7 +1279,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 							k += 16;
 						}
-						
+
 						if (lastG-k >= 8)
 						{
 #ifdef WORKLOAD_COUNT
@@ -1297,7 +1296,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 							k += 8;
 						}
-						
+
 						if (lastG-k >= 4)
 						{
 #ifdef WORKLOAD_COUNT
@@ -1310,7 +1309,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 							k += 4;
 						}
-						
+
 						while (k != lastG)
 						{
 #ifdef WORKLOAD_COUNT
@@ -1320,15 +1319,15 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 							k++;
 						}
-						
+
 						pivot++;
 					}
 					break;
 			}
 		}
-		
+
 		// Sweep the last bucket.
-		auto last = BI.bucket_list[cbucket_id].last;
+		Record* last = BI.bucket_list[cbucket_id].last;
 		switch (bufferSize)
 		{
 			case 1:
@@ -1372,7 +1371,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 					pivot += 32;
 				}
-				
+
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
 #ifdef WORKLOAD_COUNT
@@ -1383,7 +1382,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 2:
 				while ((last-pivot >= 16) && (curr->end > (pivot+15)->start))
 				{
@@ -1425,7 +1424,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 					pivot += 16;
 				}
-				
+
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
 #ifdef WORKLOAD_COUNT
@@ -1437,7 +1436,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 3:
 				while ((last-pivot >= 8) && (curr->end > (pivot+7)->start))
 				{
@@ -1471,20 +1470,41 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 					pivot += 8;
 				}
-				
+
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
 #ifdef WORKLOAD_COUNT
-					result += 3;
+					result += 24;
 #else
-					result += (curr+0)->start ^ pivot->start;
-					result += (curr+1)->start ^ pivot->start;
-					result += (curr+2)->start ^ pivot->start;
+					result += (curr+0)->start ^ (pivot+0)->start;
+					result += (curr+1)->start ^ (pivot+0)->start;
+					result += (curr+2)->start ^ (pivot+0)->start;
+					result += (curr+0)->start ^ (pivot+1)->start;
+					result += (curr+1)->start ^ (pivot+1)->start;
+					result += (curr+2)->start ^ (pivot+1)->start;
+					result += (curr+0)->start ^ (pivot+2)->start;
+					result += (curr+1)->start ^ (pivot+2)->start;
+					result += (curr+2)->start ^ (pivot+2)->start;
+					result += (curr+0)->start ^ (pivot+3)->start;
+					result += (curr+1)->start ^ (pivot+3)->start;
+					result += (curr+2)->start ^ (pivot+3)->start;
+					result += (curr+0)->start ^ (pivot+4)->start;
+					result += (curr+1)->start ^ (pivot+4)->start;
+					result += (curr+2)->start ^ (pivot+4)->start;
+					result += (curr+0)->start ^ (pivot+5)->start;
+					result += (curr+1)->start ^ (pivot+5)->start;
+					result += (curr+2)->start ^ (pivot+5)->start;
+					result += (curr+0)->start ^ (pivot+6)->start;
+					result += (curr+1)->start ^ (pivot+6)->start;
+					result += (curr+2)->start ^ (pivot+6)->start;
+					result += (curr+0)->start ^ (pivot+7)->start;
+					result += (curr+1)->start ^ (pivot+7)->start;
+					result += (curr+2)->start ^ (pivot+7)->start;
 #endif
 					pivot++;
 				}
 				break;
-				
+
 			case 4:
 				while ((last-pivot >= 8) && (curr->end > (pivot+7)->start))
 				{
@@ -1526,7 +1546,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 					pivot += 8;
 				}
-				
+
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
 #ifdef WORKLOAD_COUNT
@@ -1540,7 +1560,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 5:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1556,7 +1576,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 6:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1573,7 +1593,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 7:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1591,7 +1611,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 8:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1610,7 +1630,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 9:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1630,7 +1650,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 10:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1651,7 +1671,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 11:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1673,7 +1693,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 12:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1696,7 +1716,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 13:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1720,7 +1740,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 14:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1745,7 +1765,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 15:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1771,7 +1791,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 16:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1798,7 +1818,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 17:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1826,7 +1846,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 18:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1855,7 +1875,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 19:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1885,7 +1905,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 20:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1916,7 +1936,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 21:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1948,7 +1968,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 22:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -1981,7 +2001,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 23:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2015,7 +2035,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 24:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2050,7 +2070,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 25:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2086,7 +2106,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 26:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2123,7 +2143,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 27:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2161,7 +2181,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 28:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2200,7 +2220,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 29:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2240,7 +2260,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 30:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2281,7 +2301,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 31:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2323,7 +2343,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			case 32:
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
@@ -2366,11 +2386,11 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					pivot++;
 				}
 				break;
-				
+
 			default:
 				while ((last-pivot >= 32) && (curr->end > (pivot+31)->start))
 				{
-					for (auto k = curr; k != lastG; k++)
+					for (Record* k = curr; k != lastG; k++)
 					{
 #ifdef WORKLOAD_COUNT
 						result += 32;
@@ -2411,10 +2431,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					}
 					pivot += 32;
 				}
-				
+
 				if ((last-pivot >= 16) && (curr->end > (pivot+15)->start))
 				{
-					for (auto k = curr; k != lastG; k++)
+					for (Record* k = curr; k != lastG; k++)
 					{
 #ifdef WORKLOAD_COUNT
 						result += 16;
@@ -2439,10 +2459,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					}
 					pivot += 16;
 				}
-				
+
 				if ((last-pivot >= 8) && (curr->end > (pivot+7)->start))
 				{
-					for (auto k = curr; k != lastG; k++)
+					for (Record* k = curr; k != lastG; k++)
 					{
 #ifdef WORKLOAD_COUNT
 						result += 8;
@@ -2459,10 +2479,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					}
 					pivot += 8;
 				}
-				
+
 				if ((last-pivot >= 4) && (curr->end > (pivot+3)->start))
 				{
-					for (auto k = curr; k != lastG; k++)
+					for (Record* k = curr; k != lastG; k++)
 					{
 #ifdef WORKLOAD_COUNT
 						result += 4;
@@ -2475,10 +2495,10 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 					}
 					pivot += 4;
 				}
-				
+
 				while ((pivot < last) && (pivot->start < curr->end))
 				{
-					auto k = curr;
+					Record* k = curr;
 					while (lastG-k >= 32)
 					{
 #ifdef WORKLOAD_COUNT
@@ -2519,7 +2539,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						k += 32;
 					}
-					
+
 					if (lastG-k >= 16)
 					{
 #ifdef WORKLOAD_COUNT
@@ -2544,7 +2564,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						k += 16;
 					}
-					
+
 					if (lastG-k >= 8)
 					{
 #ifdef WORKLOAD_COUNT
@@ -2561,7 +2581,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						k += 8;
 					}
-					
+
 					if (lastG-k >= 4)
 					{
 #ifdef WORKLOAD_COUNT
@@ -2574,7 +2594,7 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						k += 4;
 					}
-					
+
 					while (k != lastG)
 					{
 #ifdef WORKLOAD_COUNT
@@ -2584,16 +2604,75 @@ inline uint64_t bguFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, co
 #endif
 						k++;
 					}
-					
+
 					pivot++;
 				}
 				break;
 		}
 	}
-	
-	
+
+
 	return result;
 }
+
+/*
+inline uint64_t bgFS_InternalLoop(Group &G, Record* firstFS, Record* lastFS, const BucketIndex &BI, Timestamp minStart)
+{
+	uint64_t result = 0;
+	long int cbucket_id, pbucket_id;
+
+	Record* pivot = firstFS;
+	Record* lastG = &G.record_list[G.numRecords-1] + 1;
+	for (Record* curr = &G.record_list[0]; curr != lastG; curr++)
+	{
+		if (pivot == lastFS)
+			break;
+		if (curr->end < minStart)
+			continue;
+
+		cbucket_id = ceil((double)(curr->end-minStart)/BI.bucket_range);
+		if (cbucket_id >= BI.numBuckets)
+			cbucket_id = BI.numBuckets-1;
+		pbucket_id = ceil((double)(pivot->end-minStart)/BI.bucket_range);
+		if (pbucket_id >= BI.numBuckets)
+			pbucket_id = BI.numBuckets-1;
+
+		if (cbucket_id > pbucket_id)
+		{
+			Record* last = BI.bucket_list[cbucket_id-1].last;
+			while (pivot != last)
+			{
+				for (Record* k = curr; k != lastG; k++)
+				{
+#ifdef WORKLOAD_COUNT
+					result += 1;
+#else
+					result += k->start ^ pivot->start;
+#endif
+				}
+				pivot++;
+			}
+		}
+
+		// Sweep the last bucket.
+		Record* last = BI.bucket_list[cbucket_id].last;
+		while ((pivot != last) && (curr->end > pivot->start))
+		{
+			for (Record* k = curr; k != lastG; k++)
+			{
+#ifdef WORKLOAD_COUNT
+				result += 1;
+#else
+				result += k->start ^ pivot->start;
+#endif
+			}
+			pivot++;
+		}
+	}
+
+	return result;
+}
+*/
 
 //////////////////////////////
 // Single-thread processing //
@@ -2668,7 +2747,6 @@ uint64_t bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS)
 			GS.numRecords = 0;
 		}
 	}
-	
 	
 	return result;
 }

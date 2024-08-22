@@ -42,6 +42,9 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 // bguFS
 uint64_t bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
 
+// dip anti join
+uint64_t dip_anti(Relation& R, Relation& S, Timestamp& domainStart, Timestamp& domainEnd);
+
 // used to get the id of an available thread
 uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize);
 
@@ -70,6 +73,10 @@ struct structForParallelFS
 	uint32_t threadId;						// thread id
 	uint64_t* thread_results;	// array that keeps the results of each thread
 	uint32_t* jobsList;			// list of threads - needs to be updated at the end of the computation
+
+	/* required only for DIP - bguFS computes always inner join so it doesn't need them */
+	Timestamp domainStart;
+	Timestamp domainEnd;
 };
 
 void* worker_bguFS(void* args)
@@ -104,8 +111,35 @@ void* worker_bguFS(void* args)
 	return NULL;
 }
 
-uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, ExtendedRelation& exS, Borders& bordersS,
-										   uint32_t runNumThreads, bool outerFlag)
+void* worker_dip_anti(void* args)
+{
+	structForParallelFS *gained = (structForParallelFS*) args;
+
+	Relation R;
+	R.numRecords = 0;
+	R.minStart = std::numeric_limits<Timestamp>::max();
+	R.maxStart = std::numeric_limits<Timestamp>::min();
+	R.minEnd   = std::numeric_limits<Timestamp>::max();
+	R.maxEnd   = std::numeric_limits<Timestamp>::min();
+	R.load( *(gained->exR), gained->R_start, gained->R_end);
+
+	Relation S;
+	S.numRecords = 0;
+	S.minStart = std::numeric_limits<Timestamp>::max();
+	S.maxStart = std::numeric_limits<Timestamp>::min();
+	S.minEnd   = std::numeric_limits<Timestamp>::max();
+	S.maxEnd   = std::numeric_limits<Timestamp>::min();
+	S.load( *(gained->exS), gained->S_start, gained->S_end);
+
+	gained->thread_results[ gained->threadId ] += dip_anti(R, S, gained->domainStart, gained->domainEnd);
+
+	// make current thread free to be used for next group
+	gained->jobsList[ gained->threadId ] = 2;
+
+	return NULL;
+}
+
+uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, ExtendedRelation& exS, Borders& bordersS, uint32_t runNumThreads, int algorithm, bool outerFlag)
 {
 	#ifdef TIMES
 	Timer tim;
@@ -128,8 +162,10 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 
 	// loop through Relations existing in ExtendedRelations
 	Timestamp domainStart = std::min(exR.minStart, exS.minStart);
+	Timestamp domainEnd = std::max(exR.maxEnd, exS.maxEnd);
 	std::vector< BordersElement >::iterator it_exR = bordersR.begin();
 	std::vector< BordersElement >::iterator it_exS = bordersS.begin();
+
 	while (it_exR != bordersR.end())
 	{
 		if ( (it_exS == bordersS.end()) || ((it_exR->group1 < it_exS->group1) || ((it_exR->group1 == it_exS->group1)) && (it_exR->group2 < it_exS->group2)) )
@@ -171,8 +207,14 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 				toPass[threadId].threadId = threadId;
 				toPass[threadId].jobsList = jobsList;
 				toPass[threadId].thread_results = thread_results;
-				
-				pthread_create( &threads[threadId], NULL, worker_bguFS, &toPass[threadId]);
+
+				toPass[threadId].domainStart = domainStart;
+				toPass[threadId].domainEnd = domainEnd;
+
+				if (algorithm == BGU_FS)
+					pthread_create( &threads[threadId], NULL, worker_bguFS, &toPass[threadId]);
+				else if (algorithm == DIP)
+					pthread_create( &threads[threadId], NULL, worker_dip_anti, &toPass[threadId]);
 			}
 
 			it_exR++;
@@ -203,16 +245,17 @@ int main(int argc, char **argv)
 {
 	uint32_t runNumThreads = 0;
 	uint64_t result = 0;
-	int joinType;
+	int joinType = -1;
+	int algorithm = -1;
 
 	// Parse and check command line input.
-	if (argc != 7)
+	if (argc != 9)
 	{
-		printf("Usage: ./ij -j joinType -t threadNum FILE1 FILE2\n");
+		printf("Usage: ./ij -j joinType -a algorithm -t threadNum FILE1 FILE2\n");
 		exit(1);
 	}
 	char c;
-	while ((c = getopt(argc, argv, "j:t:")) != -1)
+	while ((c = getopt(argc, argv, "j:a:t:")) != -1)
 	{
 		switch (c)
 		{
@@ -243,6 +286,21 @@ int main(int argc, char **argv)
 					exit(1);
 				}
 				break;
+			case 'a':
+				if (!strcmp(optarg,"bguFS"))
+				{
+					algorithm = BGU_FS;
+				}
+				else if (!strcmp(optarg,"DIP"))
+				{
+					algorithm = DIP;
+				}
+				else
+				{
+					printf("Unknown Join algorithm provided\n");
+					exit(1);
+				}
+				break;
 			case 't':
 				runNumThreads = atoi(optarg);
 				if (runNumThreads <= 0)
@@ -252,7 +310,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			default:
-				printf("Usage: ./ij -j joinType -t threadNum FILE1 FILE2\n");
+				printf("Usage: ./ij -j joinType -s algorithm -t threadNum FILE1 FILE2\n");
 				exit(1);
 		}
 	}
@@ -264,6 +322,11 @@ int main(int argc, char **argv)
 	if (joinType == -1)
 	{
 		printf("No join type provided\n");
+		exit(1);
+	}
+	if (algorithm == -1)
+	{
+		printf("No join algorithm provided\n");
 		exit(1);
 	}
 	if (argc-optind < 2)
@@ -307,49 +370,64 @@ int main(int argc, char **argv)
 	Borders bordersS;
 	mainBorders( exR, bordersR, exS, bordersS, runNumThreads);
 
-	// run join
-	if (joinType == INNER_JOIN)
+	// run join using the algorithm provided
+	if (algorithm == BGU_FS)
 	{
-		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
-	}
-	else if (joinType == LEFT_OUTER_JOIN)
-	{
-		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
+		if (joinType == INNER_JOIN)
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+		}
+		else if (joinType == LEFT_OUTER_JOIN)
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
 
-		ExtendedRelation exS_complement;
-		Borders bordersS_complement;
-		convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-		result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
-	}
-	else if (joinType == RIGHT_OUTER_JOIN)
-	{
-		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
+			ExtendedRelation exS_complement;
+			Borders bordersS_complement;
+			convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
+		}
+		else if (joinType == RIGHT_OUTER_JOIN)
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
 
-		ExtendedRelation exR_complement;
-		Borders bordersR_complement;
-		convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-		result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
-	}
-	else if (joinType == FULL_OUTER_JOIN)
-	{
-		result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, false);
+			ExtendedRelation exR_complement;
+			Borders bordersR_complement;
+			convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
+			result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, algorithm, true);
+		}
+		else if (joinType == FULL_OUTER_JOIN)
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
 
-		ExtendedRelation exS_complement;
-		Borders bordersS_complement;
-		convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-		result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
-		
-		ExtendedRelation exR_complement;
-		Borders bordersR_complement;
-		convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-		result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, true);
+			ExtendedRelation exS_complement;
+			Borders bordersS_complement;
+			convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
+			
+			ExtendedRelation exR_complement;
+			Borders bordersR_complement;
+			convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
+			result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, algorithm, true);
+		}
+		else if (joinType == ANTI_JOIN)
+		{
+			ExtendedRelation exS_complement;
+			Borders bordersS_complement;
+			convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
+		}
 	}
-	else if (joinType == ANTI_JOIN)
+	else if (algorithm == DIP)
 	{
-		ExtendedRelation exS_complement;
-		Borders bordersS_complement;
-		convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-		result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, true);
+		if (joinType == ANTI_JOIN)
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
+		}
+		else
+		{
+			printf("\n-- DIP only implemented for anti joins --\n");
+			return 0;
+		}
 	}
 
 	// Report stats

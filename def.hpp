@@ -43,7 +43,7 @@
 #include <cstring>
 
 /* LOGGING PARAMETERS */
-#define TIMES
+//#define TIMES
 #define WORKLOAD_COUNT
 
 /* JOIN TYPES */
@@ -52,6 +52,10 @@
 #define RIGHT_OUTER_JOIN 2
 #define FULL_OUTER_JOIN 3
 #define ANTI_JOIN 4
+
+/* AVAILABLE STRATEGIES TO RUN (ANTI) JOIN */
+#define BGU_FS 0
+#define DIP 1
 
 typedef unsigned long long Timestamp;
 
