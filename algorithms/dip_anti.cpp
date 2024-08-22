@@ -68,17 +68,6 @@ void create_dip(Relation& R, std::vector<dip_heap_node>& heap_r)
 	}
 }
 
-inline char overlap( Timestamp& start, Timestamp& end, Timestamp& leadStart, Timestamp& leadEnd)
-{
-	if ( end <= leadStart )
-		return 1;
-
-	if ( start >= leadEnd )
-		return 2;
-
-	return 0;
-}
-
 uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& domainStart, Timestamp& domainEnd)
 {
 	uint64_t result = 0;
@@ -87,19 +76,22 @@ uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& 
 	Timestamp longestS = domainStart;
 	Timestamp leadStart, leadEnd;
 
-	// initialize current position for pointers in heap_r
+	// initialize current and end position for pointers in heap_r
 	size_t partitions_num = heap_r.size();
-	size_t* currentR = (size_t*) malloc( partitions_num * sizeof(size_t) );
+	Record** currentR = (Record**) malloc( partitions_num * sizeof(Record*) );
+	Record** endR = (Record**) malloc( partitions_num * sizeof(Record*) );
 	for (uint32_t i = 0; i < partitions_num; i++)
-		currentR[i] = 0;
+	{
+		currentR[i] = &heap_r[i].partition[0];
+		endR[i] = &heap_r[i].partition[0] + heap_r[i].partition.size();
+	}
 
 	// scan S and get s.X in every step of the loop
 	Record* currentS = S.record_list;
 	Record* lastS = S.record_list + S.numRecords;
-	char c;
 	while (currentS != lastS)
 	{
-		// get s.X, scan partitions if its > 0
+		// get s.X, scan partitions for overlaps, if its > 0
 		if (longestS < currentS->start)
 		{
 			leadStart = longestS;
@@ -109,28 +101,29 @@ uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& 
 			// scan DIP partitions for s.X
 			for (uint32_t i = 0; i < partitions_num; i++)
 			{
-				for ( ; currentR[i] < heap_r[i].partition.size(); currentR[i]++ )
+				while (currentR[i] != endR[i])
 				{
-					// 3 cases: a) overlap, b) no overlap and continue c) no overlap and break;
-					c = overlap( heap_r[i].partition[currentR[i]].start , heap_r[i].partition[currentR[i]].end , leadStart , leadEnd );
-					if ( c == 0 )
+					// 3 cases:
+					// a) overlap -> output result tuple and move to next tuple from R
+					// b) no overlap and move to next tuple from R (r is left of S.X)
+					// c) no overlap and break (r is right of S.X);
+					if ( currentR[i]->start >= leadEnd ) // case b
+					{
+						break;
+					}
+					else if ( currentR[i]->end > leadStart ) // case a
 					{
 #ifdef WORKLOAD_COUNT
 						result += 1;
 #else
-						result += heap_r[i].partition[ currentR[i] ].start ^ leadStart;
+						result += currentR[i]->start ^ leadStart;
 #endif
 					}
-					else if ( c == 2 )
-					{
-						if (currentR[i] > 0)
-							currentR[i]--;
-						break;
-					}
+
+					currentR[i]++;
 				}
-				if (c == 0)
-					if (currentR[i] > 0)
-						currentR[i]--;
+				if (currentR[i] != &heap_r[i].partition[0])
+					currentR[i]--;
 			}
 		}
 		else if (longestS < currentS->end)
@@ -141,7 +134,7 @@ uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& 
 		currentS++;
 	}
 
-	// one last step for last lead (doesnt exist in original DIP but its part of complement approach)
+	// one last step for last lead with domainEnd (doesnt exist like that in original DIP but its part of complement design)
 	currentS--;
 	if ( longestS < domainEnd)
 	{
@@ -150,23 +143,29 @@ uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& 
 
 		for (uint32_t i = 0; i < partitions_num; i++)
 		{
-			for (uint32_t j = currentR[i]; j < heap_r[i].partition.size(); j++ )
+			while (currentR[i] != endR[i])
 			{
-				c = overlap( heap_r[i].partition[j].start , heap_r[i].partition[j].end , leadStart , leadEnd );
-				if (c == 0)
+				if ( currentR[i]->start >= leadEnd ) // case b
+				{
+					break;
+				}
+				else if ( currentR[i]->end > leadStart ) // case a
 				{
 #ifdef WORKLOAD_COUNT
 					result += 1;
 #else
-					result += heap_r[i].partition[ j ].start ^ leadStart;
+					result += currentR[i]->start ^ leadStart;
 #endif
 				}
+
+				currentR[i]++;
 			}
 		}
 	}
 
 	// return result
 	free( currentR );
+	free( endR );
 	return result;
 }
 
