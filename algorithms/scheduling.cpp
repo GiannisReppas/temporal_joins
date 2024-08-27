@@ -39,7 +39,7 @@ boolean varriable needsDetach has to be used to inform the caller about the need
 */
 uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize)
 {
-	uint32_t i=0;
+	uint32_t i = 0;
 	while(true)
 	{
 		if (jobsList[i] != 0)
@@ -50,7 +50,7 @@ uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSi
 			break;
 		}
 
-		i == (jobsListSize - 1) ? i = 0: i++;
+		i == (jobsListSize - 1) ? i = 0 : i++;
 	}
 
 	return i;

@@ -27,7 +27,7 @@
  ******************************************************************************/
 
 #include "../containers/relation.hpp"
-#include "../containers/borders_element.hpp"
+#include "../containers/borders.hpp"
 
 // used to get the id of an available thread
 uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize);
@@ -58,7 +58,7 @@ void* find_complement_sizes(void *args)
 	Timestamp last = gained->domainStart;
 
 	// find size of current group
-	for (uint32_t i = (*gained->borders)[gained->group_id].position_start; i <= (*gained->borders)[gained->group_id].position_end; i++)
+	for (uint32_t i = gained->borders->borders_list[gained->group_id].position_start; i <= gained->borders->borders_list[gained->group_id].position_end; i++)
 	{
 		if (last < gained->rel->record_list[i].start)
 		{
@@ -93,7 +93,7 @@ void* set_complement(void* args)
 	bool write_flag = false;
 
 	// set complement
-	for (uint32_t i = (*gained->borders)[gained->group_id].position_start; i <= (*gained->borders)[gained->group_id].position_end; i++)
+	for (uint32_t i = gained->borders->borders_list[gained->group_id].position_start; i <= gained->borders->borders_list[gained->group_id].position_end; i++)
 	{
 		if (last < gained->rel->record_list[i].start)
 		{
@@ -117,17 +117,17 @@ void* set_complement(void* args)
 	// set borders for current group (set an error border in case of an empty complement)
 	if (write_flag)
 	{
-		(*gained->borders_complement)[gained->group_id].group1 = (*gained->borders)[gained->group_id].group1;
-		(*gained->borders_complement)[gained->group_id].group2 = (*gained->borders)[gained->group_id].group2;
-		(*gained->borders_complement)[gained->group_id].position_start = gained->each_group_sizes[gained->group_id];
-		(*gained->borders_complement)[gained->group_id].position_end = point_to_write - 1;
+		gained->borders_complement->borders_list[gained->group_id].group1 = gained->borders->borders_list[gained->group_id].group1;
+		gained->borders_complement->borders_list[gained->group_id].group2 = gained->borders->borders_list[gained->group_id].group2;
+		gained->borders_complement->borders_list[gained->group_id].position_start = gained->each_group_sizes[gained->group_id];
+		gained->borders_complement->borders_list[gained->group_id].position_end = point_to_write - 1;
 	}
 	else
 	{
-		(*gained->borders_complement)[gained->group_id].group1 = (*gained->borders)[gained->group_id].group1;
-		(*gained->borders_complement)[gained->group_id].group2 = (*gained->borders)[gained->group_id].group2; 
-		(*gained->borders_complement)[gained->group_id].position_start = 1;
-		(*gained->borders_complement)[gained->group_id].position_end = 0;
+		gained->borders_complement->borders_list[gained->group_id].group1 = gained->borders->borders_list[gained->group_id].group1;
+		gained->borders_complement->borders_list[gained->group_id].group2 = gained->borders->borders_list[gained->group_id].group2; 
+		gained->borders_complement->borders_list[gained->group_id].position_start = 1;
+		gained->borders_complement->borders_list[gained->group_id].position_end = 0;
 	}
 
 	// make current thread free to be used for next group
@@ -136,8 +136,10 @@ void* set_complement(void* args)
 	return NULL;
 }
 
-void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelation& complement, Borders& borders_complement,
+void convert_to_complement( ExtendedRelation& R, Borders& borders,
+							ExtendedRelation& complement, Borders& borders_complement,
 							Timestamp foreignStart, Timestamp foreignEnd, uint32_t runNumThreads)
+
 {
 	#ifdef TIMES
 	Timer tim;
@@ -153,11 +155,12 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 	// variables used for the commplement computation
 	Timestamp domainStart = std::min( foreignStart, R.minStart);
 	Timestamp domainEnd = std::max( foreignEnd, R.maxEnd);
-	size_t *each_group_sizes = (size_t*) malloc( borders.size()*sizeof(size_t) );
-	for (uint32_t i = 0; i < borders.size(); i++)
+	size_t *each_group_sizes = (size_t*) malloc( borders.numBorders*sizeof(size_t) );
+	for (uint32_t i = 0; i < borders.numBorders; i++)
 		each_group_sizes[i] = 0;
 	uint32_t current_group_id;
-	borders_complement.resize( borders.size() );
+	borders_complement.borders_list = (BordersElement*) malloc( borders.numBorders*sizeof(BordersElement) );
+	borders_complement.numBorders = borders.numBorders;
 
 	///////////////////////////////// find the size of complement /////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,7 +168,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 	for (uint32_t i = 0; i < runNumThreads; i++)
 		jobsList[i] = 1;
 	current_group_id = 0;
-	for (auto& b : borders)
+	for (uint32_t i = 0; i < borders.numBorders; i++)
 	{
 		needsDetach = false;
 		threadId = getThreadId(needsDetach, jobsList, runNumThreads);
@@ -179,8 +182,8 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].borders = &borders;
 		toPass[threadId].each_group_sizes = each_group_sizes;
 		toPass[threadId].group_id = current_group_id;
-		toPass[threadId].group1 = b.group1;
-		toPass[threadId].group2 = b.group2;
+		toPass[threadId].group1 = borders.borders_list[i].group1;
+		toPass[threadId].group2 = borders.borders_list[i].group2;
 
 		toPass[threadId].runNumThreads = runNumThreads;
 		toPass[threadId].chunk = threadId;
@@ -200,7 +203,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 
 	// calculate full size of complement, change group sizes to points that each group should begin at new table
 	uint32_t total = 0, previous_total;
-	for (uint32_t i=0; i < borders.size(); i++)
+	for (uint32_t i=0; i < borders.numBorders; i++)
 	{
 		previous_total = total;
 		total += each_group_sizes[i];
@@ -215,7 +218,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 	for (uint32_t i = 0; i < runNumThreads; i++)
 		jobsList[i] = 1;
 	current_group_id = 0;
-	for (auto& b : borders)
+	for (uint32_t i = 0; i < borders.numBorders; i++)
 	{
 		needsDetach = false;
 		threadId = getThreadId(needsDetach, jobsList, runNumThreads);
@@ -231,8 +234,8 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].complement = &complement;
 		toPass[threadId].borders_complement = &borders_complement;
 		toPass[threadId].group_id = current_group_id;
-		toPass[threadId].group1 = b.group1;
-		toPass[threadId].group2 = b.group2;
+		toPass[threadId].group1 = borders.borders_list[i].group1;
+		toPass[threadId].group2 = borders.borders_list[i].group2;
 
 		toPass[threadId].runNumThreads = runNumThreads;
 		toPass[threadId].chunk = threadId;

@@ -27,7 +27,7 @@
  ******************************************************************************/
 
 #include "../containers/relation.hpp"
-#include "../containers/borders_element.hpp"
+#include "../containers/borders.hpp"
 
 /*
 helper function -
@@ -57,10 +57,54 @@ struct structForParallelFindBorders
 	uint32_t c;				// number of threads
 	uint32_t chunk;				// thread id [0,c)
 	ExtendedRelation *rel;			// relation to find its borders
-	std::vector< Borders > *localBorders;	// linked list for border information in each relation chunk
+	BordersElement* borders;	// linked list for border information in each relation chunk
+	uint32_t *sizes;
 };
 
-void* find_borders(void* args)
+void* find_borders_count_size(void* args)
+{
+	structForParallelFindBorders* gained = (structForParallelFindBorders*) args;
+
+	// find chunk to read from S
+	uint32_t toTakeStart, toTakeEnd;
+	chunk_to_read( gained->rel->numRecords, gained->c, gained->chunk, toTakeStart, toTakeEnd);
+	--toTakeStart;
+	--toTakeEnd;
+
+	// to handle edge case at which R.size() < c
+	if (toTakeStart > toTakeEnd)
+	{
+		gained->sizes[ gained->chunk ] = 0;
+		return NULL;
+	}
+
+	// find borders between [toTakeStart,toTakeEnd]
+	uint32_t local_size = 0;
+	if (
+		(gained->chunk == 0) ||
+		(gained->rel->record_list[toTakeStart].group1 != gained->rel->record_list[toTakeStart-1].group1) ||
+		(gained->rel->record_list[toTakeStart].group2 != gained->rel->record_list[toTakeStart-1].group2)
+	)
+	{
+		local_size++;
+	}
+	for (uint32_t i = toTakeStart+1; i <= toTakeEnd; i++)
+	{
+		if (
+			(gained->rel->record_list[i].group1 != gained->rel->record_list[i-1].group1) ||
+			(gained->rel->record_list[i].group2 != gained->rel->record_list[i-1].group2)
+		)
+		{
+			local_size++;
+		}
+	}
+
+	gained->sizes[ gained->chunk ] = local_size;
+
+	return NULL;
+}
+
+void* find_borders_set(void* args)
 {
 	structForParallelFindBorders* gained = (structForParallelFindBorders*) args;
 
@@ -75,16 +119,38 @@ void* find_borders(void* args)
 		return NULL;
 
 	// find borders between [toTakeStart,toTakeEnd]
-	Timestamp last = toTakeStart;
-	for (uint32_t i = toTakeStart; i < toTakeEnd; i++)
+	uint32_t point_to_write = gained->sizes[gained->chunk];
+	if (
+		(gained->chunk == 0) ||
+		(gained->rel->record_list[toTakeStart].group1 != gained->rel->record_list[toTakeStart-1].group1) ||
+		(gained->rel->record_list[toTakeStart].group2 != gained->rel->record_list[toTakeStart-1].group2)
+	)
 	{
-		if ( (gained->rel->record_list[i].group1 != gained->rel->record_list[i+1].group1) || (gained->rel->record_list[i].group2 != gained->rel->record_list[i+1].group2) )
+		if (gained->chunk != 0)
 		{
-			(*(gained->localBorders))[gained->chunk].push_back( BordersElement( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2, last, i) );
-			last = i + 1;
+			gained->borders[ point_to_write-1 ].position_end = toTakeStart-1;
+		}
+
+		gained->borders[ point_to_write ].group1 = gained->rel->record_list[toTakeStart].group1;
+		gained->borders[ point_to_write ].group2 = gained->rel->record_list[toTakeStart].group2;
+		gained->borders[ point_to_write ].position_start = toTakeStart;
+		point_to_write++;
+	}
+	for (uint32_t i = toTakeStart+1; i <= toTakeEnd; i++)
+	{
+		if (
+			(gained->rel->record_list[i].group1 != gained->rel->record_list[i-1].group1) ||
+			(gained->rel->record_list[i].group2 != gained->rel->record_list[i-1].group2)
+		)
+		{
+			gained->borders[ point_to_write-1 ].position_end = i-1;
+
+			gained->borders[ point_to_write ].group1 = gained->rel->record_list[i].group1;
+			gained->borders[ point_to_write ].group2 = gained->rel->record_list[i].group2;
+			gained->borders[ point_to_write ].position_start = i;
+			point_to_write++;
 		}
 	}
-	(*(gained->localBorders))[gained->chunk].push_back( BordersElement( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2, last, toTakeEnd) );
 
 	return NULL;
 }
@@ -96,72 +162,85 @@ void mainBorders( ExtendedRelation& R, Borders& bordersR, ExtendedRelation& S, B
 	tim.start();
 	#endif
 
+	// variables to be used twice for each relation
+	uint32_t total_size, previous_total;
 	pthread_t threads[c];
 	structForParallelFindBorders toPass[c];
+	uint32_t *sizes;
 
 	// find borders of each group in sorted R
-	std::vector< Borders > localBordersR(c);
-	for (uint32_t i=0; i < c; i++)
+	total_size = 0;
+	sizes = (uint32_t*) malloc( c*sizeof(uint32_t) );
+	for (uint32_t i = 0; i < c; i++)
 	{
 		toPass[i].c = c;
 		toPass[i].chunk = i;
 		toPass[i].rel = &R;
-		toPass[i].localBorders = &localBordersR;
-		pthread_create( &threads[i], NULL, find_borders, &toPass[i]);
+		toPass[i].sizes = sizes;
+		pthread_create( &threads[i], NULL, find_borders_count_size, &toPass[i]);
 	}
-	for (uint32_t i=0; i < c; i++)
+	previous_total = 0;
+	for (uint32_t i = 0; i < c; i++)
+	{
+		pthread_join( threads[i], NULL);
+		total_size += sizes[i];
+		sizes[i] = previous_total;
+		previous_total = total_size;
+	}
+	bordersR.borders_list = (BordersElement*) malloc( total_size*sizeof(BordersElement) );
+	bordersR.numBorders = total_size;
+	for (uint32_t i = 0; i < c; i++)
+	{
+		toPass[i].c = c;
+		toPass[i].chunk = i;
+		toPass[i].rel = &R;
+		toPass[i].borders = bordersR.borders_list;
+		toPass[i].sizes = sizes;
+		pthread_create( &threads[i], NULL, find_borders_set, &toPass[i]);
+	}
+	for (uint32_t i = 0; i < c; i++)
 	{
 		pthread_join( threads[i], NULL);
 	}
-	// merge linked lists
-	bordersR.insert( bordersR.end(), localBordersR[0].begin(), localBordersR[0].end() );
-	for (uint32_t i=1,j; i < c; i++)
-	{
-		// to handle edge case at which R.size() < c
-		if (localBordersR[i].size() == 0)
-			break;
-
-		// append current linked list to global linked list (merge first with last borders if needed)
-		j = 0;
-		if ( (localBordersR[i][j].group1 == (bordersR.end()-1)->group1) && (localBordersR[i][j].group2 == (bordersR.end()-1)->group2) )
-		{
-			(bordersR.end()-1)->position_end = localBordersR[i][j].position_end;
-			j = 1;
-		}
-		bordersR.insert( bordersR.end(), localBordersR[i].begin() + j, localBordersR[i].end() );
-	}
+	bordersR.borders_list[ bordersR.numBorders-1 ].position_end = R.numRecords-1;
+	free(sizes);
 
 	// find borders of each group in sorted S
-	std::vector< Borders > localBordersS(c);
-	for (uint32_t i=0; i < c; i++)
+	total_size = 0;
+	sizes = (uint32_t*) malloc( c*sizeof(uint32_t) );
+	for (uint32_t i = 0; i < c; i++)
 	{
 		toPass[i].c = c;
 		toPass[i].chunk = i;
 		toPass[i].rel = &S;
-		toPass[i].localBorders = &localBordersS;
-		pthread_create( &threads[i], NULL, find_borders, &toPass[i]);
+		toPass[i].sizes = sizes;
+		pthread_create( &threads[i], NULL, find_borders_count_size, &toPass[i]);
 	}
-	for (uint32_t i=0; i < c; i++)
+	previous_total = 0;
+	for (uint32_t i = 0; i < c; i++)
+	{
+		pthread_join( threads[i], NULL);
+		total_size += sizes[i];
+		sizes[i] = previous_total;
+		previous_total = total_size;
+	}
+	bordersS.borders_list = (BordersElement*) malloc( total_size*sizeof(BordersElement) );
+	bordersS.numBorders = total_size;
+	for (uint32_t i = 0; i < c; i++)
+	{
+		toPass[i].c = c;
+		toPass[i].chunk = i;
+		toPass[i].rel = &S;
+		toPass[i].borders = bordersS.borders_list;
+		toPass[i].sizes = sizes;
+		pthread_create( &threads[i], NULL, find_borders_set, &toPass[i]);
+	}
+	for (uint32_t i = 0; i < c; i++)
 	{
 		pthread_join( threads[i], NULL);
 	}
-	// merge linked lists
-	bordersS.insert( bordersS.end(), localBordersS[0].begin(), localBordersS[0].end() );
-	for (uint32_t i=1,j; i < c; i++)
-	{
-		// to handle edge case at which R.size() < c
-		if (localBordersS[i].size() == 0)
-			break;
-
-		// append current linked list to global linked list (merge first with last borders if needed)
-		j = 0;
-		if ( (localBordersS[i][j].group1 == (bordersS.end()-1)->group1) && (localBordersS[i][j].group2 == (bordersS.end()-1)->group2) )
-		{
-			(bordersS.end()-1)->position_end = localBordersS[i][j].position_end;
-			j = 1;
-		}
-		bordersS.insert( bordersS.end(), localBordersS[i].begin() + j, localBordersS[i].end() );
-	}
+	bordersS.borders_list[ bordersS.numBorders-1 ].position_end = S.numRecords-1;
+	free(sizes);
 
 	#ifdef TIMES
 	double timeFindBorders = tim.stop();

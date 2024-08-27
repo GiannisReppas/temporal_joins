@@ -28,7 +28,7 @@
 
 #include "getopt.h"
 #include "def.hpp"
-#include "containers/borders_element.hpp"
+#include "containers/borders.hpp"
 #include "containers/relation.hpp"
 #include "containers/bucket_index.hpp"
 
@@ -36,8 +36,7 @@
 void mainBorders( ExtendedRelation& R, Borders& bordersR, ExtendedRelation& S, Borders& bordersS, uint32_t c);
 
 // complement
-void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelation& complement, Borders& borders_complement,
-							Timestamp foreignStart, Timestamp foreignEnd, uint32_t c);
+void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelation& complement, Borders& borders_complement, Timestamp foreignStart, Timestamp foreignEnd, uint32_t runNumThreads);
 
 // bguFS
 uint64_t bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
@@ -157,39 +156,45 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 	}
 	structForParallelFS toPass[runNumThreads];
 	pthread_t threads[runNumThreads];
-	uint32_t threadId;
+	uint32_t threadId = 0;
 	bool needsDetach;
 
 	// loop through Relations existing in ExtendedRelations
 	Timestamp domainStart = std::min(exR.minStart, exS.minStart);
 	Timestamp domainEnd = std::max(exR.maxEnd, exS.maxEnd);
-	std::vector< BordersElement >::iterator it_exR = bordersR.begin();
-	std::vector< BordersElement >::iterator it_exS = bordersS.begin();
-
-	while (it_exR != bordersR.end())
+	uint32_t curr_r = 0;
+	uint32_t curr_s = 0;
+	while (curr_r != bordersR.numBorders)
 	{
-		if ( (it_exS == bordersS.end()) || ((it_exR->group1 < it_exS->group1) || ((it_exR->group1 == it_exS->group1)) && (it_exR->group2 < it_exS->group2)) )
+		if (
+			(curr_s == bordersS.numBorders) ||
+			(bordersR.borders_list[curr_r].group1 < bordersS.borders_list[curr_s].group1) ||
+			((bordersR.borders_list[curr_r].group1 == bordersS.borders_list[curr_s].group1) && (bordersR.borders_list[curr_r].group2 < bordersS.borders_list[curr_s].group2))
+		)
 		{
 			if (outerFlag)
 			{
 				// join between R and time_domain (= R)
 #ifdef WORKLOAD_COUNT
-				result += it_exR->position_end - it_exR->position_start + 1;
+				result += bordersR.borders_list[curr_r].position_end - bordersR.borders_list[curr_r].position_start + 1;
 #else
-				for (uint32_t i=it_exR->position_start; i < it_exR->position_end ; i++)
+				for (uint32_t i = borders[curr_r].position_start; i < borders[curr_r].position_end ; i++)
 					result += domainStart ^ exR.record_list[i].start;
 #endif
 			}
 
-			it_exR++;
+			curr_r++;
 		}
-		else if ((it_exR->group1 > it_exS->group1) || ((it_exR->group1 == it_exS->group1)) && (it_exR->group2 > it_exS->group2))
+		else if (
+				(bordersR.borders_list[curr_r].group1 > bordersS.borders_list[curr_s].group1) ||
+				((bordersR.borders_list[curr_r].group1 == bordersS.borders_list[curr_s].group1) && (bordersR.borders_list[curr_r].group2 > bordersS.borders_list[curr_s].group2))
+				)
 		{
-			it_exS++;
+			curr_s++;
 		}
 		else
 		{
-			if ( (it_exS->position_start != 1) || (it_exS->position_end != 0) )
+			if ( (bordersS.borders_list[curr_s].position_start != 1) || (bordersS.borders_list[curr_s].position_end != 0) )
 			{
 				needsDetach = false;
 				threadId = getThreadId(needsDetach, jobsList, runNumThreads);
@@ -199,10 +204,10 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 
 				toPass[threadId].exR = &exR;
 				toPass[threadId].exS = &exS;
-				toPass[threadId].R_start = it_exR->position_start;
-				toPass[threadId].R_end = it_exR->position_end;
-				toPass[threadId].S_start = it_exS->position_start;
-				toPass[threadId].S_end = it_exS->position_end;
+				toPass[threadId].R_start = bordersR.borders_list[curr_r].position_start;
+				toPass[threadId].R_end = bordersR.borders_list[curr_r].position_end;
+				toPass[threadId].S_start = bordersS.borders_list[curr_s].position_start;
+				toPass[threadId].S_end = bordersS.borders_list[curr_s].position_end;
 
 				toPass[threadId].threadId = threadId;
 				toPass[threadId].jobsList = jobsList;
@@ -217,14 +222,14 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 					pthread_create( &threads[threadId], NULL, worker_dip_anti, &toPass[threadId]);
 			}
 
-			it_exR++;
-			it_exS++;
+			curr_r++;
+			curr_s++;
 		}
 	}
 	for (uint32_t i=0; i < runNumThreads; i++)
 	{
-			if (jobsList[i] != 1)
-				pthread_join( threads[i], NULL);
+		if (jobsList[i] != 1)
+			pthread_join( threads[i], NULL);
 	}
 
 	for (uint32_t i = 0; i < runNumThreads; i++)
@@ -403,7 +408,7 @@ int main(int argc, char **argv)
 			Borders bordersS_complement;
 			convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
 			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
-			
+
 			ExtendedRelation exR_complement;
 			Borders bordersR_complement;
 			convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);

@@ -26,20 +26,29 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-#include "borders_element.hpp"
+#include "../def.hpp"
 
-BordersElement::BordersElement()
+class BordersElement
 {
-}
+public:
+	uint32_t group1;
+	uint32_t group2;
+	uint32_t position_start;
+	uint32_t position_end;
 
-BordersElement::BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end)
-{
-	this->group1 = group1;
-	this->group2 = group2;
-	this->position_start = position_start;
-	this->position_end = position_end;
-}
+	BordersElement();
+	BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end);
+	~BordersElement();
+};
 
-BordersElement::~BordersElement()
+/**************************************************************************************************/
+
+class Borders
 {
-}
+public:
+	BordersElement* borders_list;
+	uint32_t numBorders;
+
+	Borders();
+	~Borders();
+};
