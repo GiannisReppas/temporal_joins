@@ -9,7 +9,7 @@ else
         LDFLAGS =
 endif
 
-SOURCES = containers/borders.cpp algorithms/scheduling.cpp containers/relation.cpp algorithms/findBorders.cpp algorithms/complement.cpp containers/bucket_index.cpp algorithms/bgufs.cpp algorithms/dip_anti.cpp
+SOURCES = containers/borders.cpp algorithms/scheduling.cpp containers/relation.cpp algorithms/findBorders.cpp algorithms/complement.cpp containers/bucket_index.cpp algorithms/bgufs.cpp algorithms/dip.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
 all: main

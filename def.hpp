@@ -56,6 +56,7 @@
 /* AVAILABLE STRATEGIES TO RUN (ANTI) JOIN */
 #define BGU_FS 0
 #define DIP 1
+#define O_DIP 2
 
 typedef unsigned long long Timestamp;
 

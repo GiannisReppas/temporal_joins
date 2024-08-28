@@ -1,7 +1,7 @@
 Contains modified code from: https://github.com/pbour/ijoin
 
 Example:
-./ij -j anti -t 8 -s bguFS ./inputs/test1.tsv ./inputs/test2.tsv
+./ij -j anti -t 8 -a bguFS ./inputs/test1.tsv ./inputs/test2.tsv
 
 FS version that is always used is sequential bguFS in a master-worker manner.
 

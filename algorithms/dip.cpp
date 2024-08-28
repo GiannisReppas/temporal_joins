@@ -68,7 +68,7 @@ void create_dip(Relation& R, std::vector<dip_heap_node>& heap_r)
 	}
 }
 
-uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& domainStart, Timestamp& domainEnd)
+uint64_t o_dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& domainStart, Timestamp& domainEnd)
 {
 	uint64_t result = 0;
 
@@ -166,6 +166,160 @@ uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& 
 	// return result
 	free( currentR );
 	free( endR );
+	return result;
+}
+
+uint64_t o_dip_anti(Relation& R, Relation& S, Timestamp& domainStart, Timestamp& domainEnd)
+{
+	#ifdef TIMES
+	Timer tim;
+	tim.start();
+	#endif
+
+	std::vector<dip_heap_node> heap_r;
+	create_dip( R, heap_r);
+
+	#ifdef TIMES
+	double timeCreateDip = tim.stop();
+	std::cout << "CreateDIP time: " << timeCreateDip << std::endl;
+	tim.start();
+	#endif
+
+	uint64_t result = o_dip_merge( heap_r, S, domainStart, domainEnd);
+
+	#ifdef TIMES
+	double timeDipMerge = tim.stop();
+	std::cout << "DipMerge time: " << timeDipMerge << std::endl;
+	#endif
+
+	return result;
+}
+
+uint64_t dip_merge( std::vector<dip_heap_node>& heap_r, Relation& S, Timestamp& domainStart, Timestamp& domainEnd)
+{
+	// DIPmerge variables and result (We consider that null timepoint is +INFINITY)
+	unsigned long long result = 0;
+	const Timestamp null_timepoint = (0 - 1);
+	const Timestamp m = heap_r.size();
+
+	// load r
+	Record** current_r = (Record**) malloc( m*sizeof(Record*) );
+	Record** end_r = (Record**) malloc( m*sizeof(Record*) );
+	Record* r = (Record*) malloc( m*sizeof(Record) );
+	bool* r_nulls = (bool*) malloc( m*sizeof(bool) );
+	for (uint32_t i = 0; i < m; i++)
+	{
+		current_r[i] = &heap_r[i].partition[0];
+		end_r[i] = &heap_r[i].partition[0] + heap_r[i].partition.size();
+		r_nulls[i] = false;
+		// fetchRow(R_i)
+		r[i] = *(current_r[i])++;
+	}
+
+	// load s
+	// DIP considers domainStart = -INFINITY, so we need some extra cleaning before main loop
+	Record* current_s = S.record_list;
+	const Record* end_s = S.record_list + S.numRecords;
+	std::pair<Record,Record> s;
+	bool s_null = false;
+	// fetchRow(S)
+	s.first = *current_s++;
+	s.second = Record( domainStart, s.first.start );
+	Timestamp longestS = domainStart;
+	while (s.second.start >= s.second.end)
+	{
+		// fetchRow(S)
+		if (current_s == end_s)
+			s_null = true;
+		else
+			s.first = *current_s++;;
+		longestS = std::max( (current_s-2)->end, longestS);
+		if (s_null)
+		{
+			longestS = std::max( (current_s-1)->end, longestS);
+			s.first.start = null_timepoint;
+			if (longestS == domainEnd)
+				return 0;
+			else
+				s.second = Record( longestS, domainEnd);
+			break;
+		}
+		else
+		{
+			s.second = Record( longestS, (current_s-1)->start);
+		}
+	}
+
+	// main loop
+	Timestamp i = 0;
+	while ( (r[i].start != null_timepoint) || (s.first.start != null_timepoint) )
+	{
+		if ( (s.second.start < s.second.end) && ( (r[i].start < s.second.end) && (s.second.start < r[i].end) ) ) // overlap check
+				result++;
+
+		if ( (r[i].start != null_timepoint) && ( (s.first.start == null_timepoint) || (r[i].end <= s.first.end) ) )
+		{
+			// fetchRow(R)
+			if (current_r[i] == end_r[i])
+				r_nulls[i] = true;
+			else
+				r[i] = *(current_r[i])++;
+
+			if (r_nulls[i])
+				r[i].start = null_timepoint;
+		}
+		else
+		{
+			if (i < (m-1))
+			{
+				i++;
+			}
+			else
+			{
+				i = 0;
+
+				if (s.first.end > s.second.start)
+					longestS = s.first.end;
+
+				// fetchRow(S)
+				if (current_s == end_s)
+					s_null = true;
+				else
+					s.first = *current_s++;
+
+				if (!s_null)
+				{
+					s.second = Record(longestS, s.first.start);
+				}
+				else
+				{
+					s.first.start = null_timepoint;
+					s.second = Record(longestS, domainEnd);
+				}
+			}
+		}
+	}
+
+	// last step for last lead
+	for (Timestamp i = 0; i < m; i++)
+	{
+		if (r[i].start != null_timepoint)
+		{
+			for (Record* j = current_r[i]-1; j != end_r[i]; j++)
+			{
+				if (s.second.start < s.second.end)
+					if ( (j->start < s.second.end) && (s.second.start < j->end) && (r[i].start != null_timepoint) && (s.second.end != null_timepoint) )
+						result++;
+			}
+		}
+	}
+
+	// free and return result
+	free(r_nulls);
+	free(r);
+	free(current_r);
+	free(end_r);
+
 	return result;
 }
 

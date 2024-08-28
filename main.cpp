@@ -43,6 +43,7 @@ uint64_t bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
 
 // dip anti join
 uint64_t dip_anti(Relation& R, Relation& S, Timestamp& domainStart, Timestamp& domainEnd);
+uint64_t o_dip_anti(Relation& R, Relation& S, Timestamp& domainStart, Timestamp& domainEnd);
 
 // used to get the id of an available thread
 uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize);
@@ -138,6 +139,34 @@ void* worker_dip_anti(void* args)
 	return NULL;
 }
 
+void* worker_o_dip_anti(void* args)
+{
+	structForParallelFS *gained = (structForParallelFS*) args;
+
+	Relation R;
+	R.numRecords = 0;
+	R.minStart = std::numeric_limits<Timestamp>::max();
+	R.maxStart = std::numeric_limits<Timestamp>::min();
+	R.minEnd   = std::numeric_limits<Timestamp>::max();
+	R.maxEnd   = std::numeric_limits<Timestamp>::min();
+	R.load( *(gained->exR), gained->R_start, gained->R_end);
+
+	Relation S;
+	S.numRecords = 0;
+	S.minStart = std::numeric_limits<Timestamp>::max();
+	S.maxStart = std::numeric_limits<Timestamp>::min();
+	S.minEnd   = std::numeric_limits<Timestamp>::max();
+	S.maxEnd   = std::numeric_limits<Timestamp>::min();
+	S.load( *(gained->exS), gained->S_start, gained->S_end);
+
+	gained->thread_results[ gained->threadId ] += o_dip_anti(R, S, gained->domainStart, gained->domainEnd);
+
+	// make current thread free to be used for next group
+	gained->jobsList[ gained->threadId ] = 2;
+
+	return NULL;
+}
+
 uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, ExtendedRelation& exS, Borders& bordersS, uint32_t runNumThreads, int algorithm, bool outerFlag)
 {
 	#ifdef TIMES
@@ -220,6 +249,8 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 					pthread_create( &threads[threadId], NULL, worker_bguFS, &toPass[threadId]);
 				else if (algorithm == DIP)
 					pthread_create( &threads[threadId], NULL, worker_dip_anti, &toPass[threadId]);
+				else if (algorithm == O_DIP)
+					pthread_create( &threads[threadId], NULL, worker_o_dip_anti, &toPass[threadId]);
 			}
 
 			curr_r++;
@@ -299,6 +330,10 @@ int main(int argc, char **argv)
 				else if (!strcmp(optarg,"DIP"))
 				{
 					algorithm = DIP;
+				}
+				else if (!strcmp(optarg,"oDIP"))
+				{
+					algorithm = O_DIP;
 				}
 				else
 				{
@@ -422,7 +457,7 @@ int main(int argc, char **argv)
 			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
 		}
 	}
-	else if (algorithm == DIP)
+	else if ( (algorithm == O_DIP) || (algorithm == DIP) )
 	{
 		if (joinType == ANTI_JOIN)
 		{
