@@ -168,7 +168,7 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 	std::map< BordersKey, std::pair<uint32_t,uint32_t> >::iterator it_exS = bordersS.begin();
 	while (it_exR != bordersR.end())
 	{
-		if ( (it_exS == bordersS.end()) || (*it_exR < *it_exS) )
+		if ( (it_exS == bordersS.end()) || (it_exR->first < it_exS->first) )
 		{
 			if (outerFlag)
 			{
@@ -183,7 +183,7 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 
 			it_exR++;
 		}
-		else if (*it_exR > *it_exS)
+		else if (it_exR->first > it_exS->first)
 		{
 			it_exS++;
 		}

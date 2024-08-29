@@ -40,12 +40,12 @@ BordersKey::BordersKey(uint32_t group1, uint32_t group2)
 
 bool BordersKey::operator < (const BordersKey& rhs) const
 {
-	return ( (this->group1 < rhs.group1) || (this->group1 == rhs.group1 && this->group2 < rhs.group2) );
+	return ( (this->group1 < rhs.group1) || ((this->group1 == rhs.group1) && (this->group2 < rhs.group2)) );
 }
 
 bool BordersKey::operator > (const BordersKey& rhs) const
 {
-	return ( (this->group1 > rhs.group1) || (this->group1 == rhs.group1 && this->group2 > rhs.group2) );
+	return ( (this->group1 > rhs.group1) || ((this->group1 == rhs.group1) && (this->group2 > rhs.group2)) );
 }
 
 BordersKey::~BordersKey()
