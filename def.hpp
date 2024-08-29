@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <cstring>
+#include <map>
 
 /* LOGGING PARAMETERS */
 //#define TIMES

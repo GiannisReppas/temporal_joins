@@ -26,20 +26,28 @@
  * DEALINGS IN THE SOFTWARE.
  ******************************************************************************/
 
-#include "borders_element.hpp"
+#include "borders_key.hpp"
 
-BordersElement::BordersElement()
+BordersKey::BordersKey()
 {
 }
 
-BordersElement::BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end)
+BordersKey::BordersKey(uint32_t group1, uint32_t group2)
 {
 	this->group1 = group1;
 	this->group2 = group2;
-	this->position_start = position_start;
-	this->position_end = position_end;
 }
 
-BordersElement::~BordersElement()
+bool BordersKey::operator < (const BordersKey& rhs) const
+{
+	return ( (this->group1 < rhs.group1) || (this->group1 == rhs.group1 && this->group2 < rhs.group2) );
+}
+
+bool BordersKey::operator > (const BordersKey& rhs) const
+{
+	return ( (this->group1 > rhs.group1) || (this->group1 == rhs.group1 && this->group2 > rhs.group2) );
+}
+
+BordersKey::~BordersKey()
 {
 }

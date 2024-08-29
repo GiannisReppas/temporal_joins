@@ -28,7 +28,7 @@
 
 #include "getopt.h"
 #include "def.hpp"
-#include "containers/borders_element.hpp"
+#include "containers/borders_key.hpp"
 #include "containers/relation.hpp"
 #include "containers/bucket_index.hpp"
 
@@ -139,7 +139,8 @@ void* worker_dip_anti(void* args)
 	return NULL;
 }
 
-uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, ExtendedRelation& exS, Borders& bordersS, uint32_t runNumThreads, int algorithm, bool outerFlag)
+uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, ExtendedRelation& exS, Borders& bordersS,
+								 uint32_t runNumThreads, int algorithm, bool outerFlag)
 {
 	#ifdef TIMES
 	Timer tim;
@@ -163,33 +164,32 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 	// loop through Relations existing in ExtendedRelations
 	Timestamp domainStart = std::min(exR.minStart, exS.minStart);
 	Timestamp domainEnd = std::max(exR.maxEnd, exS.maxEnd);
-	std::vector< BordersElement >::iterator it_exR = bordersR.begin();
-	std::vector< BordersElement >::iterator it_exS = bordersS.begin();
-
+	std::map< BordersKey, std::pair<uint32_t,uint32_t> >::iterator it_exR = bordersR.begin();
+	std::map< BordersKey, std::pair<uint32_t,uint32_t> >::iterator it_exS = bordersS.begin();
 	while (it_exR != bordersR.end())
 	{
-		if ( (it_exS == bordersS.end()) || ((it_exR->group1 < it_exS->group1) || ((it_exR->group1 == it_exS->group1)) && (it_exR->group2 < it_exS->group2)) )
+		if ( (it_exS == bordersS.end()) || (*it_exR < *it_exS) )
 		{
 			if (outerFlag)
 			{
 				// join between R and time_domain (= R)
 #ifdef WORKLOAD_COUNT
-				result += it_exR->position_end - it_exR->position_start + 1;
+				result += it_exR->second.second - it_exR->second.first + 1;
 #else
-				for (uint32_t i=it_exR->position_start; i < it_exR->position_end ; i++)
+				for (uint32_t i=it_exR->second.first; i < it_exR->second.second ; i++)
 					result += domainStart ^ exR.record_list[i].start;
 #endif
 			}
 
 			it_exR++;
 		}
-		else if ((it_exR->group1 > it_exS->group1) || ((it_exR->group1 == it_exS->group1)) && (it_exR->group2 > it_exS->group2))
+		else if (*it_exR > *it_exS)
 		{
 			it_exS++;
 		}
 		else
 		{
-			if ( (it_exS->position_start != 1) || (it_exS->position_end != 0) )
+			if ( (it_exS->second.first != 1) || (it_exS->second.second != 0) )
 			{
 				needsDetach = false;
 				threadId = getThreadId(needsDetach, jobsList, runNumThreads);
@@ -199,10 +199,10 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 
 				toPass[threadId].exR = &exR;
 				toPass[threadId].exS = &exS;
-				toPass[threadId].R_start = it_exR->position_start;
-				toPass[threadId].R_end = it_exR->position_end;
-				toPass[threadId].S_start = it_exS->position_start;
-				toPass[threadId].S_end = it_exS->position_end;
+				toPass[threadId].R_start = it_exR->second.first;
+				toPass[threadId].R_end = it_exR->second.second;
+				toPass[threadId].S_start = it_exS->second.first;
+				toPass[threadId].S_end = it_exS->second.second;
 
 				toPass[threadId].threadId = threadId;
 				toPass[threadId].jobsList = jobsList;

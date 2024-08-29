@@ -28,17 +28,17 @@
 
 #include "../def.hpp"
 
-class BordersElement
+class BordersKey
 {
 public:
 	uint32_t group1;
 	uint32_t group2;
-	uint32_t position_start;
-	uint32_t position_end;
 
-	BordersElement();
-	BordersElement(uint32_t group1, uint32_t group2, uint32_t position_start, uint32_t position_end);
-	~BordersElement();
+	BordersKey();
+	BordersKey(uint32_t group1, uint32_t group2);
+	bool operator < (const BordersKey& rhs) const;
+	bool operator > (const BordersKey& rhs) const;
+	~BordersKey();
 };
 
-typedef std::vector<BordersElement> Borders;
+typedef std::map<BordersKey,std::pair<uint32_t,uint32_t>> Borders;

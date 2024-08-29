@@ -27,7 +27,7 @@
  ******************************************************************************/
 
 #include "../containers/relation.hpp"
-#include "../containers/borders_element.hpp"
+#include "../containers/borders_key.hpp"
 
 // used to get the id of an available thread
 uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize);
@@ -42,8 +42,7 @@ struct structForParallelComplement
 	ExtendedRelation* complement;		// place to save complement
 	Borders* borders_complement;		// border information to be set for complement relation
 	uint32_t group_id;			// id of current group [0,groups_num-1]
-	uint32_t group1;			// group1 value to compute complement
-	uint32_t group2;			// group2 value to compute complement
+	BordersKey group;			// group value to compute complement
 
 	uint32_t runNumThreads;				// number of threads
 	uint32_t chunk;				// thread id [0,c)
@@ -58,7 +57,7 @@ void* find_complement_sizes(void *args)
 	Timestamp last = gained->domainStart;
 
 	// find size of current group
-	for (uint32_t i = (*gained->borders)[gained->group_id].position_start; i <= (*gained->borders)[gained->group_id].position_end; i++)
+	for (uint32_t i = (*(gained->borders))[gained->group].first; i <= ((*gained->borders))[gained->group].second; i++)
 	{
 		if (last < gained->rel->record_list[i].start)
 		{
@@ -93,12 +92,12 @@ void* set_complement(void* args)
 	bool write_flag = false;
 
 	// set complement
-	for (uint32_t i = (*gained->borders)[gained->group_id].position_start; i <= (*gained->borders)[gained->group_id].position_end; i++)
+	for (uint32_t i = (*gained->borders)[gained->group].first; i <= (*gained->borders)[gained->group].second; i++)
 	{
 		if (last < gained->rel->record_list[i].start)
 		{
 			write_flag = true;
-			gained->complement->record_list[point_to_write] = ExtendedRecord(last, gained->rel->record_list[i].start, gained->group1, gained->group2);
+			gained->complement->record_list[point_to_write] = ExtendedRecord(last, gained->rel->record_list[i].start, gained->group.group1, gained->group.group2);
 			last = gained->rel->record_list[i].end;
 			point_to_write++;
 		}
@@ -110,24 +109,18 @@ void* set_complement(void* args)
 	if (last < gained->domainEnd)
 	{
 		write_flag = true;
-		gained->complement->record_list[point_to_write] = ExtendedRecord(last, gained->domainEnd, gained->group1, gained->group2);
+		gained->complement->record_list[point_to_write] = ExtendedRecord(last, gained->domainEnd, gained->group.group1, gained->group.group2);
 		point_to_write++;
 	}
 
 	// set borders for current group (set an error border in case of an empty complement)
 	if (write_flag)
 	{
-		(*gained->borders_complement)[gained->group_id].group1 = (*gained->borders)[gained->group_id].group1;
-		(*gained->borders_complement)[gained->group_id].group2 = (*gained->borders)[gained->group_id].group2;
-		(*gained->borders_complement)[gained->group_id].position_start = gained->each_group_sizes[gained->group_id];
-		(*gained->borders_complement)[gained->group_id].position_end = point_to_write - 1;
+		(*gained->borders_complement)[gained->group] = std::pair<uint32_t,uint32_t>( gained->each_group_sizes[gained->group_id], point_to_write - 1);
 	}
 	else
 	{
-		(*gained->borders_complement)[gained->group_id].group1 = (*gained->borders)[gained->group_id].group1;
-		(*gained->borders_complement)[gained->group_id].group2 = (*gained->borders)[gained->group_id].group2; 
-		(*gained->borders_complement)[gained->group_id].position_start = 1;
-		(*gained->borders_complement)[gained->group_id].position_end = 0;
+		(*gained->borders_complement)[gained->group] = std::pair<uint32_t,uint32_t>( 1, 0);
 	}
 
 	// make current thread free to be used for next group
@@ -157,7 +150,6 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 	for (uint32_t i = 0; i < borders.size(); i++)
 		each_group_sizes[i] = 0;
 	uint32_t current_group_id;
-	borders_complement.resize( borders.size() );
 
 	///////////////////////////////// find the size of complement /////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,8 +171,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].borders = &borders;
 		toPass[threadId].each_group_sizes = each_group_sizes;
 		toPass[threadId].group_id = current_group_id;
-		toPass[threadId].group1 = b.group1;
-		toPass[threadId].group2 = b.group2;
+		toPass[threadId].group = b.first;
 
 		toPass[threadId].runNumThreads = runNumThreads;
 		toPass[threadId].chunk = threadId;
@@ -231,8 +222,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].complement = &complement;
 		toPass[threadId].borders_complement = &borders_complement;
 		toPass[threadId].group_id = current_group_id;
-		toPass[threadId].group1 = b.group1;
-		toPass[threadId].group2 = b.group2;
+		toPass[threadId].group = b.first;
 
 		toPass[threadId].runNumThreads = runNumThreads;
 		toPass[threadId].chunk = threadId;

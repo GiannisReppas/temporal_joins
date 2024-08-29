@@ -27,7 +27,7 @@
  ******************************************************************************/
 
 #include "../containers/relation.hpp"
-#include "../containers/borders_element.hpp"
+#include "../containers/borders_key.hpp"
 
 /*
 helper function -
@@ -57,7 +57,7 @@ struct structForParallelFindBorders
 	uint32_t c;				// number of threads
 	uint32_t chunk;				// thread id [0,c)
 	ExtendedRelation *rel;			// relation to find its borders
-	std::vector< Borders > *localBorders;	// linked list for border information in each relation chunk
+	Borders *localBorders;	// linked list for border information in each relation chunk
 };
 
 void* find_borders(void* args)
@@ -80,11 +80,11 @@ void* find_borders(void* args)
 	{
 		if ( (gained->rel->record_list[i].group1 != gained->rel->record_list[i+1].group1) || (gained->rel->record_list[i].group2 != gained->rel->record_list[i+1].group2) )
 		{
-			(*(gained->localBorders))[gained->chunk].push_back( BordersElement( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2, last, i) );
+			(*(gained->localBorders))[ BordersKey( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2) ] =std::pair<uint32_t,uint32_t>(last, i);
 			last = i + 1;
 		}
 	}
-	(*(gained->localBorders))[gained->chunk].push_back( BordersElement( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2, last, toTakeEnd) );
+	(*(gained->localBorders))[ BordersKey( gained->rel->record_list[last].group1, gained->rel->record_list[last].group2) ] = std::pair<uint32_t,uint32_t>(last, toTakeEnd);
 
 	return NULL;
 }
@@ -106,29 +106,23 @@ void mainBorders( ExtendedRelation& R, Borders& bordersR, ExtendedRelation& S, B
 		toPass[i].c = c;
 		toPass[i].chunk = i;
 		toPass[i].rel = &R;
-		toPass[i].localBorders = &localBordersR;
+		toPass[i].localBorders = &localBordersR[i];
 		pthread_create( &threads[i], NULL, find_borders, &toPass[i]);
 	}
 	for (uint32_t i=0; i < c; i++)
 	{
 		pthread_join( threads[i], NULL);
 	}
-	// merge linked lists
-	bordersR.insert( bordersR.end(), localBordersR[0].begin(), localBordersR[0].end() );
-	for (uint32_t i=1,j; i < c; i++)
+	// merge maps
+	for (uint32_t i = 0; i < c; i++)
 	{
-		// to handle edge case at which R.size() < c
-		if (localBordersR[i].size() == 0)
-			break;
-
-		// append current linked list to global linked list (merge first with last borders if needed)
-		j = 0;
-		if ( (localBordersR[i][j].group1 == (bordersR.end()-1)->group1) && (localBordersR[i][j].group2 == (bordersR.end()-1)->group2) )
+		for (auto const& key : localBordersR[i])
 		{
-			(bordersR.end()-1)->position_end = localBordersR[i][j].position_end;
-			j = 1;
+			if ( bordersR.find( key.first ) != bordersR.end() )
+				bordersR[key.first] = localBordersR[i][key.first];
+			else
+				bordersR[key.first].second = localBordersR[i][key.first].second;
 		}
-		bordersR.insert( bordersR.end(), localBordersR[i].begin() + j, localBordersR[i].end() );
 	}
 
 	// find borders of each group in sorted S
@@ -138,29 +132,23 @@ void mainBorders( ExtendedRelation& R, Borders& bordersR, ExtendedRelation& S, B
 		toPass[i].c = c;
 		toPass[i].chunk = i;
 		toPass[i].rel = &S;
-		toPass[i].localBorders = &localBordersS;
+		toPass[i].localBorders = &localBordersS[i];
 		pthread_create( &threads[i], NULL, find_borders, &toPass[i]);
 	}
 	for (uint32_t i=0; i < c; i++)
 	{
 		pthread_join( threads[i], NULL);
 	}
-	// merge linked lists
-	bordersS.insert( bordersS.end(), localBordersS[0].begin(), localBordersS[0].end() );
-	for (uint32_t i=1,j; i < c; i++)
+	// merge maps
+	for (uint32_t i = 0; i < c; i++)
 	{
-		// to handle edge case at which R.size() < c
-		if (localBordersS[i].size() == 0)
-			break;
-
-		// append current linked list to global linked list (merge first with last borders if needed)
-		j = 0;
-		if ( (localBordersS[i][j].group1 == (bordersS.end()-1)->group1) && (localBordersS[i][j].group2 == (bordersS.end()-1)->group2) )
+		for (auto const& key : localBordersS[i])
 		{
-			(bordersS.end()-1)->position_end = localBordersS[i][j].position_end;
-			j = 1;
+			if ( bordersS.find( key.first ) != bordersS.end() )
+				bordersS[key.first] = localBordersS[i][key.first];
+			else
+				bordersS[key.first].second = localBordersS[i][key.first].second;
 		}
-		bordersS.insert( bordersS.end(), localBordersS[i].begin() + j, localBordersS[i].end() );
 	}
 
 	#ifdef TIMES
