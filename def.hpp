@@ -44,7 +44,7 @@
 #include <map>
 
 /* LOGGING PARAMETERS */
-#define TIMES
+//#define TIMES
 #define WORKLOAD_COUNT
 
 /* JOIN TYPES */

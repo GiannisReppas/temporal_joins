@@ -241,8 +241,6 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 	}
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::cout << borders.size() << " and " << borders_complement.size() << std::endl;
-
 	free( each_group_sizes );
 	free( jobsList );
 
