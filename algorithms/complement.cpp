@@ -92,7 +92,7 @@ void* set_complement(void* args)
 	bool write_flag = false;
 
 	// set complement
-	for (uint32_t i = (*gained->borders)[gained->group].first; i <= (*gained->borders)[gained->group].second; i++)
+	for (uint32_t i = (*(gained->borders))[gained->group].first; i <= (*(gained->borders))[gained->group].second; i++)
 	{
 		if (last < gained->rel->record_list[i].start)
 		{
@@ -116,11 +116,11 @@ void* set_complement(void* args)
 	// set borders for current group (set an error border in case of an empty complement)
 	if (write_flag)
 	{
-		(*gained->borders_complement)[gained->group] = std::pair<uint32_t,uint32_t>( gained->each_group_sizes[gained->group_id], point_to_write - 1);
+		(*(gained->borders_complement))[gained->group] = std::pair<uint32_t,uint32_t>( gained->each_group_sizes[gained->group_id], point_to_write - 1);
 	}
 	else
 	{
-		(*gained->borders_complement)[gained->group] = std::pair<uint32_t,uint32_t>( 1, 0);
+		(*(gained->borders_complement))[gained->group] = std::pair<uint32_t,uint32_t>( 1, 0);
 	}
 
 	// make current thread free to be used for next group
@@ -220,6 +220,7 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 		toPass[threadId].borders = &borders;
 		toPass[threadId].each_group_sizes = each_group_sizes;
 		toPass[threadId].complement = &complement;
+		borders_complement.emplace(b.first, std::pair<uint32_t,uint32_t>(0,0));
 		toPass[threadId].borders_complement = &borders_complement;
 		toPass[threadId].group_id = current_group_id;
 		toPass[threadId].group = b.first;
@@ -239,6 +240,8 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 			pthread_join( threads[i], NULL);
 	}
 	////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::cout << borders.size() << " and " << borders_complement.size() << std::endl;
 
 	free( each_group_sizes );
 	free( jobsList );
