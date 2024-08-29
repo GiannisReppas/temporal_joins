@@ -118,10 +118,10 @@ void mainBorders( ExtendedRelation& R, Borders& bordersR, ExtendedRelation& S, B
 	{
 		for (auto const& key : localBordersR[i])
 		{
-			if ( bordersR.find( key.first ) != bordersR.end() )
-				bordersR[key.first] = localBordersR[i][key.first];
+			if ( bordersR.find( key.first ) == bordersR.end() )
+				bordersR[key.first] = key.second;
 			else
-				bordersR[key.first].second = localBordersR[i][key.first].second;
+				bordersR[key.first] = std::pair<uint32_t,uint32_t>( std::min(bordersR[key.first].first,key.second.first) , std::max(bordersR[key.first].second,key.second.second) );
 		}
 	}
 
@@ -144,10 +144,10 @@ void mainBorders( ExtendedRelation& R, Borders& bordersR, ExtendedRelation& S, B
 	{
 		for (auto const& key : localBordersS[i])
 		{
-			if ( bordersS.find( key.first ) != bordersS.end() )
-				bordersS[key.first] = localBordersS[i][key.first];
+			if ( bordersS.find( key.first ) == bordersS.end() )
+				bordersS[key.first] = key.second;
 			else
-				bordersS[key.first].second = localBordersS[i][key.first].second;
+				bordersS[key.first] = std::pair<uint32_t,uint32_t>( std::min(bordersS[key.first].first,key.second.first) , std::max(bordersS[key.first].second,key.second.second) );
 		}
 	}
 
