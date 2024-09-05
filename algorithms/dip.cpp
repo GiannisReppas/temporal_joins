@@ -255,7 +255,11 @@ uint64_t dip_merge_anti( std::vector<dip_heap_node>& heap_r, Relation& S, Timest
 	while ( (r[i].start != null_timepoint) || (s.first.start != null_timepoint) )
 	{
 		if ( (s.second.start < s.second.end) && ( (r[i].start < s.second.end) && (s.second.start < r[i].end) ) ) // overlap check
-				result++;
+#ifdef WORKLOAD_COUNT
+			result += 1;
+#else
+			result += r[i].start ^ s.second.start;
+#endif
 
 		if ( (r[i].start != null_timepoint) && ( (s.first.start == null_timepoint) || (r[i].end <= s.first.end) ) )
 		{
@@ -309,7 +313,11 @@ uint64_t dip_merge_anti( std::vector<dip_heap_node>& heap_r, Relation& S, Timest
 			{
 				if (s.second.start < s.second.end)
 					if ( (j->start < s.second.end) && (s.second.start < j->end) && (r[i].start != null_timepoint) && (s.second.end != null_timepoint) )
-						result++;
+#ifdef WORKLOAD_COUNT
+						result += 1;
+#else
+						result += j->start ^ s.second.start;
+#endif
 			}
 		}
 	}
