@@ -41,9 +41,10 @@ void convert_to_complement( ExtendedRelation& R, Borders& borders, ExtendedRelat
 // bguFS
 uint64_t bguFS(Relation &R, Relation &S, BucketIndex &BIR, BucketIndex &BIS);
 
-// dip anti join
+// dip algorithms
 uint64_t dip_anti(Relation& R, Relation& S, Timestamp& domainStart, Timestamp& domainEnd);
 uint64_t o_dip_anti(Relation& R, Relation& S, Timestamp& domainStart, Timestamp& domainEnd);
+uint64_t dip_inner(Relation& R, Relation& S, Timestamp& domainStart, Timestamp& domainEnd);
 
 // used to get the id of an available thread
 uint32_t getThreadId(bool& needsDetach, uint32_t* jobsList, uint32_t& jobsListSize);
@@ -132,6 +133,34 @@ void* worker_dip_anti(void* args)
 	S.load( *(gained->exS), gained->S_start, gained->S_end);
 
 	gained->thread_results[ gained->threadId ] += dip_anti(R, S, gained->domainStart, gained->domainEnd);
+
+	// make current thread free to be used for next group
+	gained->jobsList[ gained->threadId ] = 2;
+
+	return NULL;
+}
+
+void* worker_dip_inner(void* args)
+{
+	structForParallelFS *gained = (structForParallelFS*) args;
+
+	Relation R;
+	R.numRecords = 0;
+	R.minStart = std::numeric_limits<Timestamp>::max();
+	R.maxStart = std::numeric_limits<Timestamp>::min();
+	R.minEnd   = std::numeric_limits<Timestamp>::max();
+	R.maxEnd   = std::numeric_limits<Timestamp>::min();
+	R.load( *(gained->exR), gained->R_start, gained->R_end);
+
+	Relation S;
+	S.numRecords = 0;
+	S.minStart = std::numeric_limits<Timestamp>::max();
+	S.maxStart = std::numeric_limits<Timestamp>::min();
+	S.minEnd   = std::numeric_limits<Timestamp>::max();
+	S.maxEnd   = std::numeric_limits<Timestamp>::min();
+	S.load( *(gained->exS), gained->S_start, gained->S_end);
+
+	gained->thread_results[ gained->threadId ] += dip_inner(R, S, gained->domainStart, gained->domainEnd);
 
 	// make current thread free to be used for next group
 	gained->jobsList[ gained->threadId ] = 2;
@@ -248,7 +277,7 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 				if (algorithm == BGU_FS)
 					pthread_create( &threads[threadId], NULL, worker_bguFS, &toPass[threadId]);
 				else if (algorithm == DIP)
-					pthread_create( &threads[threadId], NULL, worker_dip_anti, &toPass[threadId]);
+					pthread_create( &threads[threadId], NULL, outerFlag ? worker_dip_anti : worker_dip_inner, &toPass[threadId]);
 				else if (algorithm == O_DIP)
 					pthread_create( &threads[threadId], NULL, worker_o_dip_anti, &toPass[threadId]);
 			}
@@ -457,15 +486,35 @@ int main(int argc, char **argv)
 			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
 		}
 	}
-	else if ( (algorithm == O_DIP) || (algorithm == DIP) )
+	else
 	{
-		if (joinType == ANTI_JOIN)
+		if ( (joinType == INNER_JOIN) && (algorithm == DIP) )
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+		}
+		else if ( (joinType == LEFT_OUTER_JOIN) && (algorithm == DIP) )
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
+		}
+		else if ( (joinType == RIGHT_OUTER_JOIN) && (algorithm == DIP) )
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+			result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, algorithm, true);
+		}
+		else if ( (joinType == FULL_OUTER_JOIN) && (algorithm == DIP) )
+		{
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
+			result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, algorithm, true);
+		}
+		else if (joinType == ANTI_JOIN)
 		{
 			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
 		}
 		else
 		{
-			printf("\n-- DIP only implemented for anti joins --\n");
+			printf("\n-- oDIP only implemented for anti joins --\n");
 			return 0;
 		}
 	}
