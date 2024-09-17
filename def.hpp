@@ -43,8 +43,8 @@
 #include <cstring>
 
 /* LOGGING PARAMETERS */
-//#define TIMES
-#define WORKLOAD_COUNT
+#define TIMES
+//#define WORKLOAD_COUNT
 
 /* JOIN TYPES */
 #define INNER_JOIN 0

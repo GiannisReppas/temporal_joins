@@ -125,7 +125,7 @@ void* set_complement(void* args)
 	else
 	{
 		gained->borders_complement->borders_list[gained->group_id].group1 = gained->borders->borders_list[gained->group_id].group1;
-		gained->borders_complement->borders_list[gained->group_id].group2 = gained->borders->borders_list[gained->group_id].group2; 
+		gained->borders_complement->borders_list[gained->group_id].group2 = gained->borders->borders_list[gained->group_id].group2;
 		gained->borders_complement->borders_list[gained->group_id].position_start = 1;
 		gained->borders_complement->borders_list[gained->group_id].position_end = 0;
 	}

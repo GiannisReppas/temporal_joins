@@ -236,7 +236,7 @@ uint64_t extended_temporal_join( ExtendedRelation& exR, Borders& bordersR, Exten
 #ifdef WORKLOAD_COUNT
 				result += bordersR.borders_list[curr_r].position_end - bordersR.borders_list[curr_r].position_start + 1;
 #else
-				for (uint32_t i = borders[curr_r].position_start; i < borders[curr_r].position_end ; i++)
+				for (uint32_t i = bordersR.borders_list[curr_r].position_start; i < bordersR.borders_list[curr_r].position_end ; i++)
 					result += domainStart ^ exR.record_list[i].start;
 #endif
 			}
@@ -312,18 +312,28 @@ int main(int argc, char **argv)
 	uint64_t result = 0;
 	int joinType = -1;
 	int algorithm = -1;
+	int computations = 1;
 
 	// Parse and check command line input.
-	if (argc != 9)
+	if ( (argc != 11) && (argc != 9) )
 	{
-		printf("Usage: ./ij -j joinType -a algorithm -t threadNum FILE1 FILE2\n");
+		printf("Usage: ./ij -j joinType -a algorithm -t threadNum -n computations_num FILE1 FILE2\n");
+		printf("--Computations is not mandatory and set as 1 by default\n");
 		exit(1);
 	}
 	char c;
-	while ((c = getopt(argc, argv, "j:a:t:")) != -1)
+	while ((c = getopt(argc, argv, "j:a:t:n:")) != -1)
 	{
 		switch (c)
 		{
+			case 'n':
+				computations = atoi(optarg);
+				if (computations <= 0)
+				{
+					printf("More than 0 computations required\n");
+					exit(1);
+				}
+				break;
 			case 'j':
 				if (!strcmp(optarg,"inner"))
 				{
@@ -379,7 +389,8 @@ int main(int argc, char **argv)
 				}
 				break;
 			default:
-				printf("Usage: ./ij -j joinType -s algorithm -t threadNum FILE1 FILE2\n");
+				printf("Usage: ./ij -j joinType -s algorithm -t threadNum -n computations_num FILE1 FILE2\n");
+				printf("--Computations is not mandatory and set as 1 by default\n");
 				exit(1);
 		}
 	}
@@ -440,82 +451,89 @@ int main(int argc, char **argv)
 	mainBorders( exR, bordersR, exS, bordersS, runNumThreads);
 
 	// run join using the algorithm provided
-	if (algorithm == BGU_FS)
+	for (uint32_t i = 0; i < computations; i++)
 	{
-		if (joinType == INNER_JOIN)
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
-		}
-		else if (joinType == LEFT_OUTER_JOIN)
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+		printf("\n----------------------\n");
+		result = 0;
 
-			ExtendedRelation exS_complement;
-			Borders bordersS_complement;
-			convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
-		}
-		else if (joinType == RIGHT_OUTER_JOIN)
+		if (algorithm == BGU_FS)
 		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+			if (joinType == INNER_JOIN)
+			{
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+			}
+			else if (joinType == LEFT_OUTER_JOIN)
+			{
+				ExtendedRelation exS_complement;
+				Borders bordersS_complement;
+				convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
 
-			ExtendedRelation exR_complement;
-			Borders bordersR_complement;
-			convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-			result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, algorithm, true);
-		}
-		else if (joinType == FULL_OUTER_JOIN)
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+				result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
+			}
+			else if (joinType == RIGHT_OUTER_JOIN)
+			{
+				ExtendedRelation exR_complement;
+				Borders bordersR_complement;
+				convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
 
-			ExtendedRelation exS_complement;
-			Borders bordersS_complement;
-			convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+				result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, algorithm, true);
+			}
+			else if (joinType == FULL_OUTER_JOIN)
+			{
+				ExtendedRelation exS_complement;
+				Borders bordersS_complement;
+				convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
 
-			ExtendedRelation exR_complement;
-			Borders bordersR_complement;
-			convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
-			result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, algorithm, true);
-		}
-		else if (joinType == ANTI_JOIN)
-		{
-			ExtendedRelation exS_complement;
-			Borders bordersS_complement;
-			convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
-			result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
-		}
-	}
-	else
-	{
-		if ( (joinType == INNER_JOIN) && (algorithm == DIP) )
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
-		}
-		else if ( (joinType == LEFT_OUTER_JOIN) && (algorithm == DIP) )
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
-		}
-		else if ( (joinType == RIGHT_OUTER_JOIN) && (algorithm == DIP) )
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
-			result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, algorithm, true);
-		}
-		else if ( (joinType == FULL_OUTER_JOIN) && (algorithm == DIP) )
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
-			result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, algorithm, true);
-		}
-		else if (joinType == ANTI_JOIN)
-		{
-			result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
+				ExtendedRelation exR_complement;
+				Borders bordersR_complement;
+				convert_to_complement( exR, bordersR, exR_complement, bordersR_complement, exS.minStart, exS.maxEnd, runNumThreads);
+
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+				result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
+				result += extended_temporal_join( exS, bordersS, exR_complement, bordersR_complement, runNumThreads, algorithm, true);
+			}
+			else if (joinType == ANTI_JOIN)
+			{
+				ExtendedRelation exS_complement;
+				Borders bordersS_complement;
+				convert_to_complement( exS, bordersS, exS_complement, bordersS_complement, exR.minStart, exR.maxEnd, runNumThreads);
+
+				result += extended_temporal_join( exR, bordersR, exS_complement, bordersS_complement, runNumThreads, algorithm, true);
+			}
 		}
 		else
 		{
-			printf("\n-- oDIP only implemented for anti joins --\n");
-			return 0;
+			if ( (joinType == INNER_JOIN) && (algorithm == DIP) )
+			{
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+			}
+			else if ( (joinType == LEFT_OUTER_JOIN) && (algorithm == DIP) )
+			{
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
+			}
+			else if ( (joinType == RIGHT_OUTER_JOIN) && (algorithm == DIP) )
+			{
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+				result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, algorithm, true);
+			}
+			else if ( (joinType == FULL_OUTER_JOIN) && (algorithm == DIP) )
+			{
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, false);
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
+				result += extended_temporal_join( exS, bordersS, exR, bordersR, runNumThreads, algorithm, true);
+			}
+			else if (joinType == ANTI_JOIN)
+			{
+				result += extended_temporal_join( exR, bordersR, exS, bordersS, runNumThreads, algorithm, true);
+			}
+			else
+			{
+				printf("\n-- oDIP only implemented for anti joins --\n");
+				return 0;
+			}
 		}
 	}
 
