@@ -5,8 +5,6 @@
  ******************************************************************************
  * Copyright (c) 2023, Ioannis Reppas
  *
- * All rights reserved.
- *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation
@@ -32,7 +30,7 @@
 Returns a thread id that is free to be used.
 Array jobs contains all available threads.
 Each thread has 3 different states:
-	0 --> thread is currently executing a job and its unavailable 
+	0 --> thread is currently executing a job and its unavailable
 	1 --> thread is available and doesn't need to be detached to be used again
 	2 --> thread is available and needs to be detached to be used again
 boolean varriable needsDetach has to be used to inform the caller about the need to be detached
